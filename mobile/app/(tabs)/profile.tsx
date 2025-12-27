@@ -13,19 +13,22 @@ import {
   Platform,
   Share,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import * as Clipboard from 'expo-clipboard';
+import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { useThemeColors } from '@/hooks';
 import { SPACING, FONTS, BORDER_RADIUS } from '@/constants';
-import { uploadService } from '@/services';
+import { uploadService, stripeService } from '@/services';
 import { api } from '@/services/api';
 import { invitationService } from '@/services/invitation';
 import { InvitationInfo } from '@/types';
+import { StripeStatus } from '@/services/stripe';
 
 export default function ProfileScreen() {
   const colors = useThemeColors();
@@ -46,12 +49,82 @@ export default function ProfileScreen() {
   const [invitationInfo, setInvitationInfo] = useState<InvitationInfo | null>(null);
   const [loadingInvitation, setLoadingInvitation] = useState(false);
 
+  // Stripe state
+  const [showStripeModal, setShowStripeModal] = useState(false);
+  const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null);
+  const [loadingStripe, setLoadingStripe] = useState(false);
+  const [startingOnboarding, setStartingOnboarding] = useState(false);
+
   const isCurator = user?.role === 'curator' || user?.curator?.approved;
 
   // Load invitation info on mount
   useEffect(() => {
     loadInvitationInfo();
   }, []);
+
+  // Load Stripe status for curators
+  useEffect(() => {
+    if (isCurator) {
+      loadStripeStatus();
+    }
+  }, [isCurator]);
+
+  const loadStripeStatus = async () => {
+    try {
+      setLoadingStripe(true);
+      const status = await stripeService.getStatus();
+      setStripeStatus(status);
+    } catch (error) {
+      console.error('Failed to load Stripe status:', error);
+    } finally {
+      setLoadingStripe(false);
+    }
+  };
+
+  const handleStripeSetup = async () => {
+    if (stripeStatus?.onboardingComplete) {
+      // Already set up - show status
+      Alert.alert(
+        'Payment Setup Complete',
+        'Your Stripe account is connected and ready to receive payouts.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    setShowStripeModal(true);
+  };
+
+  const startStripeOnboarding = async () => {
+    try {
+      setStartingOnboarding(true);
+      const result = await stripeService.getOnboardingLink();
+
+      if (result.onboardingComplete) {
+        await loadStripeStatus();
+        setShowStripeModal(false);
+        Alert.alert('Already Complete', 'Your payment setup is already complete!');
+        return;
+      }
+
+      if (result.onboardingUrl) {
+        // Open Stripe onboarding in browser
+        const browserResult = await WebBrowser.openBrowserAsync(result.onboardingUrl);
+
+        // After returning from browser, refresh status
+        await loadStripeStatus();
+        await refreshUser?.();
+        setShowStripeModal(false);
+
+        if (stripeStatus?.onboardingComplete) {
+          Alert.alert('Success', 'Payment setup complete! You can now receive payouts.');
+        }
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to start payment setup');
+    } finally {
+      setStartingOnboarding(false);
+    }
+  };
 
   const loadInvitationInfo = async () => {
     try {
@@ -236,6 +309,12 @@ export default function ProfileScreen() {
 
   const menuItems = [
     { icon: 'person-outline', label: 'Edit Profile', onPress: () => showComingSoon('Edit Profile') },
+    ...(isCurator ? [{
+      icon: 'wallet-outline',
+      label: stripeStatus?.onboardingComplete ? 'Payment Setup ✓' : 'Payment Setup',
+      onPress: handleStripeSetup,
+      highlight: !stripeStatus?.onboardingComplete,
+    }] : []),
     { icon: 'card-outline', label: 'Payment Methods', onPress: () => showComingSoon('Payment Methods') },
     { icon: 'location-outline', label: 'Shipping Addresses', onPress: () => showComingSoon('Shipping Addresses') },
     { icon: 'notifications-outline', label: 'Notifications', onPress: () => showComingSoon('Notifications') },
@@ -530,6 +609,61 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Stripe Setup Modal */}
+      <Modal
+        visible={showStripeModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowStripeModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={[styles.modalContent, styles.glassCard, { backgroundColor: 'rgba(45, 27, 78, 0.95)' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Payment Setup
+              </Text>
+              <TouchableOpacity onPress={() => setShowStripeModal(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>
+              Connect your bank account to receive payouts when you make sales. This is required to start earning as a curator.
+            </Text>
+
+            <View style={[styles.stripeInfoBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Ionicons name="shield-checkmark" size={24} color={colors.success} />
+              <View style={styles.stripeInfoText}>
+                <Text style={[styles.stripeInfoTitle, { color: colors.text }]}>Secure & Fast</Text>
+                <Text style={[styles.stripeInfoDesc, { color: colors.textSecondary }]}>
+                  Powered by Stripe. Your banking details are never stored on our servers.
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.submitButton, { backgroundColor: colors.accent }]}
+              onPress={startStripeOnboarding}
+              disabled={startingOnboarding}
+            >
+              {startingOnboarding ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="card-outline" size={20} color="#FFFFFF" style={{ marginRight: SPACING.sm }} />
+                  <Text style={styles.submitButtonText}>Connect Bank Account</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <Text style={[styles.stripePowered, { color: colors.textMuted }]}>
+              You'll be redirected to Stripe to complete setup
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -726,6 +860,7 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.md,
   },
   submitButton: {
+    flexDirection: 'row',
     height: 48,
     borderRadius: BORDER_RADIUS.md,
     justifyContent: 'center',
@@ -784,5 +919,31 @@ const styles = StyleSheet.create({
   inviteActionText: {
     fontSize: FONTS.sizes.md,
     fontWeight: '600',
+  },
+  stripeInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    marginBottom: SPACING.lg,
+    gap: SPACING.md,
+  },
+  stripeInfoText: {
+    flex: 1,
+  },
+  stripeInfoTitle: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: '600',
+    marginBottom: SPACING.xs,
+  },
+  stripeInfoDesc: {
+    fontSize: FONTS.sizes.sm,
+    lineHeight: 18,
+  },
+  stripePowered: {
+    fontSize: FONTS.sizes.sm,
+    textAlign: 'center',
+    marginTop: SPACING.md,
   },
 });

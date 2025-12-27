@@ -53,13 +53,59 @@
 10. **VIP Buyer Subscription** - Early access to listings
 
 ## TODO / PENDING SETUP
-- [ ] **Stripe Connect** - Marketplace payments for curators
+- [x] **Stripe Connect** - Marketplace payments for curators (implemented)
 - [ ] **Push Notifications** - Expo Push for real-time alerts
 - [ ] **Resend Email Setup** - Set up Resend for curator application notifications
-  - Create account at https://resend.com
-  - Add RESEND_API_KEY to Vercel: `npx vercel env add RESEND_API_KEY`
-  - Verify domain nafisaszcloset.com in Resend (or use onboarding@resend.dev for testing)
-  - Curator applications will email nafisasz@gmail.com
+
+## STRIPE CONNECT SETUP
+
+### Environment Variables Required
+Add to Vercel:
+```bash
+npx vercel env add STRIPE_SECRET_KEY        # sk_test_... or sk_live_...
+npx vercel env add STRIPE_WEBHOOK_SECRET    # whsec_... from Stripe Dashboard
+```
+
+### Stripe Dashboard Setup
+1. Go to https://dashboard.stripe.com/connect/settings
+2. Enable "Express" account type
+3. Set branding (logo, colors, etc.)
+4. Add redirect URLs:
+   - Return URL: `nafisascloset://stripe-return`
+   - Refresh URL: `https://nafisasz-closet.vercel.app/api/stripe/connect?refresh=true`
+
+### Webhook Setup
+1. Go to https://dashboard.stripe.com/webhooks
+2. Add endpoint: `https://nafisasz-closet.vercel.app/api/stripe/webhook`
+3. Select events:
+   - `account.updated`
+   - `payment_intent.succeeded`
+   - `payment_intent.payment_failed`
+   - `transfer.created`
+   - `charge.dispute.created`
+4. Copy signing secret to `STRIPE_WEBHOOK_SECRET`
+
+### Cron Job (Vercel Pro required for per-minute)
+The `/api/cron/check-auctions` endpoint runs every 5 minutes to:
+- Find expired auctions with winning bids
+- Create transaction records
+- Initiate PaymentIntent for winners
+
+Alternative: Use external cron service (cron-job.org) for free tier.
+
+### API Endpoints
+- `GET/POST /api/stripe/connect` - Curator onboarding
+- `POST /api/stripe/webhook` - Stripe event handler
+- `GET /api/transactions` - List user transactions
+- `POST /api/transactions/:id/confirm-purchase` - Curator confirms
+- `POST /api/transactions/:id/mark-shipped` - Add tracking
+- `POST /api/transactions/:id/confirm-delivery` - Buyer confirms, triggers payout
+
+### Resend Email Setup (for curator notifications)
+- Create account at https://resend.com
+- Add RESEND_API_KEY to Vercel: `npx vercel env add RESEND_API_KEY`
+- Verify domain nafisaszcloset.com in Resend (or use onboarding@resend.dev for testing)
+- Curator applications will email nafisasz@gmail.com
 
 ## UX TERMINOLOGY RULES
 

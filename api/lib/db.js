@@ -123,6 +123,8 @@ export async function initDatabase() {
       shipping_cost DECIMAL(10,2),
       status VARCHAR(30) DEFAULT 'pending_payment',
       payment_intent_id VARCHAR(255),
+      stripe_transfer_id VARCHAR(255),
+      payout_completed_at TIMESTAMP,
       receipt_url TEXT,
       tracking_number VARCHAR(255),
       shipping_label TEXT,
@@ -131,6 +133,15 @@ export async function initDatabase() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
+  `);
+
+  // Add columns for existing transactions tables
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE transactions ADD COLUMN IF NOT EXISTS stripe_transfer_id VARCHAR(255);
+      ALTER TABLE transactions ADD COLUMN IF NOT EXISTS payout_completed_at TIMESTAMP;
+    EXCEPTION WHEN others THEN NULL;
+    END $$;
   `);
 
   // Follows table

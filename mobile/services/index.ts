@@ -5,3 +5,5 @@ export { curatorsService } from './curators';
 export { bidsService } from './bids';
 export { socketService } from './socket';
 export { uploadService } from './upload';
+export { stripeService } from './stripe';
+export { transactionsService } from './transactions';
