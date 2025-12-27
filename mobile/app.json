@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Nafisa's Closet",
+    "slug": "nafisas-closet",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "nafisascloset",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#FFFFFF",
+      "image": "./assets/nc-logo.png",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nafisascloset.app",
+      "usesAppleSignIn": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#000000"
+      },
+      "package": "com.nafisascloset.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-apple-authentication"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

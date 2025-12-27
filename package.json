@@ -1,0 +1,15 @@
+{
+  "name": "nafisas-closet",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "cloudinary": "^2.8.0",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.16.3",
+    "resend": "^6.6.0"
+  }
+}
