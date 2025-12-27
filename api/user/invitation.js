@@ -61,7 +61,7 @@ export default async function handler(req, res) {
     const referralCount = parseInt(referralResult.rows[0].count) || 0;
 
     // Generate invite link
-    const baseUrl = process.env.APP_URL || 'https://nafisaszcloset.com';
+    const baseUrl = process.env.APP_URL || 'https://nafisasz-closet.vercel.app';
     const inviteLink = `${baseUrl}/invite/${code}`;
     const deepLink = `nafisascloset://invite?code=${code}`;
 
