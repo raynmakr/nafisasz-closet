@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { query, getCurator } from '../lib/db.js';
+import { query, getCurator } from '../../lib/db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 

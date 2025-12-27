@@ -1,10 +1,10 @@
 import jwt from 'jsonwebtoken';
-import { query, getCurator } from '../lib/db.js';
+import { query, getCurator } from '../../lib/db.js';
 import {
   createConnectAccount,
   createAccountLink,
   checkAccountStatus,
-} from '../lib/stripe.js';
+} from '../../lib/stripe.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 const APP_URL = process.env.APP_URL || 'https://nafisasz-closet.vercel.app';

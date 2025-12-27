@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { getActiveListings, getListing, createListing, publishListing, getCurator, getListingBids } from './lib/db.js';
+import { getActiveListings, getListing, createListing, publishListing, getCurator, getListingBids } from '../lib/db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 

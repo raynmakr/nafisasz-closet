@@ -1,5 +1,5 @@
-import { verifyWebhookSignature } from '../lib/stripe.js';
-import { query } from '../lib/db.js';
+import { verifyWebhookSignature } from '../../lib/stripe.js';
+import { query } from '../../lib/db.js';
 
 // Disable body parsing for webhook signature verification
 export const config = {

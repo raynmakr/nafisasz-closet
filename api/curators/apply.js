@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { Resend } from 'resend';
-import { getUser, query } from '../lib/db.js';
+import { getUser, query } from '../../lib/db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 
