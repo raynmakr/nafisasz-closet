@@ -32,6 +32,19 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  // Handle special query actions (for redirects from Stripe)
+  const { action: queryAction, refresh, complete, token: queryToken } = req.query;
+
+  // Handle reauth redirect (when link expires)
+  if (refresh === 'true' || queryAction === 'reauth') {
+    return await handleReauth(req, res, queryToken);
+  }
+
+  // Handle onboarding complete redirect
+  if (complete === 'true' || queryAction === 'complete') {
+    return await handleOnboardingComplete(req, res, queryToken);
+  }
+
   const decoded = verifyToken(req);
   if (!decoded) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -194,4 +207,97 @@ async function handleCreateLink(req, res, decoded) {
     onboardingUrl: accountLink.url,
     expiresAt: new Date(accountLink.expires_at * 1000).toISOString(),
   });
+}
+
+/**
+ * Handle reauth - when onboarding link expires
+ */
+async function handleReauth(req, res, token) {
+  let decoded = null;
+
+  if (token) {
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch {
+      // Token invalid
+    }
+  }
+
+  // If no valid token, redirect to app with error
+  if (!decoded) {
+    const redirectUrl = `${APP_SCHEME}://stripe-return?status=reauth_needed`;
+    return res.redirect(302, redirectUrl);
+  }
+
+  try {
+    const curator = await getCurator(decoded.userId);
+    if (!curator || !curator.stripe_account_id) {
+      const redirectUrl = `${APP_SCHEME}://stripe-return?status=error&message=no_account`;
+      return res.redirect(302, redirectUrl);
+    }
+
+    // Check if already complete
+    const status = await checkAccountStatus(curator.stripe_account_id);
+    if (status.complete) {
+      const redirectUrl = `${APP_SCHEME}://stripe-return?status=success`;
+      return res.redirect(302, redirectUrl);
+    }
+
+    // Generate new onboarding link
+    const returnUrl = `${APP_SCHEME}://stripe-return?status=success`;
+    const refreshUrl = `${APP_URL}/api/stripe/connect?refresh=true&token=${token}`;
+
+    const accountLink = await createAccountLink(curator.stripe_account_id, returnUrl, refreshUrl);
+
+    // Redirect to new onboarding link
+    return res.redirect(302, accountLink.url);
+  } catch (error) {
+    console.error('Reauth error:', error);
+    const redirectUrl = `${APP_SCHEME}://stripe-return?status=error&message=${encodeURIComponent(error.message)}`;
+    return res.redirect(302, redirectUrl);
+  }
+}
+
+/**
+ * Handle onboarding complete - update status and redirect to app
+ */
+async function handleOnboardingComplete(req, res, token) {
+  if (!token) {
+    const redirectUrl = `${APP_SCHEME}://stripe-return?status=success`;
+    return res.redirect(302, redirectUrl);
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, JWT_SECRET);
+  } catch {
+    const redirectUrl = `${APP_SCHEME}://stripe-return?status=success`;
+    return res.redirect(302, redirectUrl);
+  }
+
+  try {
+    const curator = await getCurator(decoded.userId);
+
+    if (curator && curator.stripe_account_id) {
+      // Check and update status
+      const status = await checkAccountStatus(curator.stripe_account_id);
+
+      if (status.complete && !curator.stripe_onboarding_complete) {
+        await query(
+          `UPDATE curators SET stripe_onboarding_complete = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          [curator.id]
+        );
+      }
+
+      const redirectUrl = `${APP_SCHEME}://stripe-return?status=${status.complete ? 'success' : 'incomplete'}`;
+      return res.redirect(302, redirectUrl);
+    }
+
+    const redirectUrl = `${APP_SCHEME}://stripe-return?status=success`;
+    return res.redirect(302, redirectUrl);
+  } catch (error) {
+    console.error('Onboarding complete error:', error);
+    const redirectUrl = `${APP_SCHEME}://stripe-return?status=error`;
+    return res.redirect(302, redirectUrl);
+  }
 }
