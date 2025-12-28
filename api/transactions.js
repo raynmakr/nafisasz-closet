@@ -1,6 +1,8 @@
 import jwt from 'jsonwebtoken';
 import { query, getCurator } from '../lib/db.js';
 import { createTransfer } from '../lib/stripe.js';
+import { notifyBuyerItemShipped } from '../lib/notifications.js';
+import { incrementPurchaseCount, checkCuratorSaleMilestones } from '../lib/purse.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 
@@ -159,11 +161,12 @@ async function handleMarkShipped(req, res, decoded, transactionId) {
     return res.status(400).json({ error: 'Tracking number required' });
   }
 
-  // Get transaction
+  // Get transaction with listing info
   const txResult = await query(`
-    SELECT t.*, c.user_id as curator_user_id
+    SELECT t.*, c.user_id as curator_user_id, l.title as listing_title
     FROM transactions t
     JOIN curators c ON t.curator_id = c.id
+    JOIN listings l ON t.listing_id = l.id
     WHERE t.id = $1
   `, [transactionId]);
 
@@ -194,7 +197,13 @@ async function handleMarkShipped(req, res, decoded, transactionId) {
     WHERE id = $3
   `, [trackingNumber, shippingLabel, transactionId]);
 
-  // TODO: Send notification to buyer with tracking info
+  // Send notification to buyer with tracking info
+  notifyBuyerItemShipped(
+    tx.buyer_id,
+    transactionId,
+    tx.listing_title,
+    trackingNumber
+  ).catch((err) => console.error('Failed to send shipped notification:', err));
 
   return res.json({ success: true, status: 'shipped' });
 }
@@ -267,6 +276,11 @@ async function handleConfirmDelivery(req, res, decoded, transactionId) {
 
       console.log(`Payout complete: Transfer ${transfer.id} to curator for $${tx.curator_earnings}`);
 
+      // Award milestone coins (async, don't block response)
+      awardDeliveryMilestones(tx.buyer_id, tx.curator_id).catch(err =>
+        console.error('Error awarding delivery milestones:', err)
+      );
+
       return res.json({
         success: true,
         status: 'payout_complete',
@@ -284,10 +298,49 @@ async function handleConfirmDelivery(req, res, decoded, transactionId) {
     }
   } else {
     console.warn(`Curator ${tx.curator_id} has no Stripe account, payout skipped`);
+
+    // Still award milestone coins even if payout is skipped
+    awardDeliveryMilestones(tx.buyer_id, tx.curator_id).catch(err =>
+      console.error('Error awarding delivery milestones:', err)
+    );
+
     return res.json({
       success: true,
       status: 'delivered',
       payoutSkipped: 'Curator has not completed Stripe onboarding',
     });
   }
+}
+
+/**
+ * Award milestone coins after successful delivery
+ * - Buyer: purchase count milestone (1st, 3rd, 5th, 10th)
+ * - Curator: sale count milestone (1st, 10th, 50th)
+ */
+async function awardDeliveryMilestones(buyerId, curatorId) {
+  const results = { buyer: [], curator: [] };
+
+  // Award buyer milestones (increments purchase count and checks thresholds)
+  try {
+    const buyerAwards = await incrementPurchaseCount(buyerId);
+    if (buyerAwards?.length > 0) {
+      console.log(`Awarded buyer ${buyerId} milestones:`, buyerAwards);
+      results.buyer = buyerAwards;
+    }
+  } catch (err) {
+    console.error(`Failed to check buyer milestones for ${buyerId}:`, err);
+  }
+
+  // Award curator milestones (checks sale thresholds)
+  try {
+    const curatorAwards = await checkCuratorSaleMilestones(curatorId);
+    if (curatorAwards?.length > 0) {
+      console.log(`Awarded curator ${curatorId} milestones:`, curatorAwards);
+      results.curator = curatorAwards;
+    }
+  } catch (err) {
+    console.error(`Failed to check curator milestones for ${curatorId}:`, err);
+  }
+
+  return results;
 }

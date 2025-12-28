@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,8 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { listingsService, socketService, curatorsService } from '@/services';
+import { listingsService, socketService, curatorsService, auctionService } from '@/services';
+import { stripeService } from '@/services/stripe';
 import { useListingsStore, useLikesStore } from '@/stores';
 import { useThemeColors, useListingTimer } from '@/hooks';
 import { useAuth } from '@/src/context/AuthContext';
@@ -35,6 +36,7 @@ export default function ListingDetailScreen() {
   const [lastTap, setLastTap] = useState<number | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [completionStatus, setCompletionStatus] = useState<'idle' | 'completing' | 'completed'>('idle');
   const heartScale = useRef(new Animated.Value(0)).current;
 
   const { data: listing, isLoading, refetch } = useQuery({
@@ -63,7 +65,108 @@ export default function ListingDetailScreen() {
     setRefreshing(false);
   };
 
-  const { formatted, isEnding, isExpired } = useListingTimer(listing?.auctionEnd ?? null);
+  // Handle auction expiration - triggers completion API
+  const handleAuctionExpired = useCallback(async (listingId: string) => {
+    if (completionStatus !== 'idle') return; // Already processing
+
+    try {
+      setCompletionStatus('completing');
+      const result = await auctionService.completeAuction(listingId, 'timer_expired');
+
+      if (result.success) {
+        // Refresh listing data
+        queryClient.invalidateQueries({ queryKey: ['listing', id] });
+        queryClient.invalidateQueries({ queryKey: ['listings'] });
+
+        if (result.status === 'sold' && result.transaction) {
+          // Check if current user is the winner
+          if (result.transaction.winnerId === user?.id?.toString()) {
+            if (result.paymentStatus === 'paid') {
+              Alert.alert(
+                'You Won!',
+                `Congratulations! You won this item for $${result.transaction.finalPrice.toLocaleString()}. Your card has been charged automatically.`,
+                [{ text: 'OK' }]
+              );
+            } else if (result.paymentStatus === 'payment_failed') {
+              Alert.alert(
+                'You Won - Payment Failed',
+                `You won this item but your payment failed. Please update your payment method.`,
+                [
+                  { text: 'Later', style: 'cancel' },
+                  {
+                    text: 'Update Card',
+                    onPress: () => router.push('/add-payment-method'),
+                  },
+                ]
+              );
+            } else {
+              Alert.alert(
+                'You Won!',
+                `Congratulations! You won this item for $${result.transaction.finalPrice.toLocaleString()}. Complete payment now?`,
+                [
+                  { text: 'Later', style: 'cancel' },
+                  {
+                    text: 'Pay Now',
+                    onPress: () => router.push(`/payment/${result.transaction!.id}`),
+                  },
+                ]
+              );
+            }
+          } else {
+            Alert.alert('Auction Ended', `Won by ${result.transaction.winnerName}`);
+          }
+        } else if (result.status === 'expired') {
+          Alert.alert('Auction Ended', 'This auction ended with no claims.');
+        }
+        setCompletionStatus('completed');
+      }
+    } catch (error) {
+      console.error('Failed to complete auction:', error);
+      // Silently fail - safety net cron will handle it
+      setCompletionStatus('idle');
+    }
+  }, [completionStatus, user?.id, queryClient, id]);
+
+  // Handle curator early close
+  const handleCuratorCloseEarly = async () => {
+    Alert.alert(
+      'Close Auction Early',
+      listing?.currentHighBid
+        ? `Are you sure you want to end this auction? The current highest claim is $${listing.currentHighBid.toLocaleString()}.`
+        : 'Are you sure you want to end this auction with no claims? The item will be marked as expired.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Close Auction',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setCompletionStatus('completing');
+              const result = await auctionService.curatorCloseEarly(id!);
+              queryClient.invalidateQueries({ queryKey: ['listing', id] });
+              queryClient.invalidateQueries({ queryKey: ['listings'] });
+              queryClient.invalidateQueries({ queryKey: ['my-listings'] });
+
+              if (result.status === 'sold') {
+                Alert.alert('Success', 'Auction closed! Winner will be notified to pay.');
+              } else {
+                Alert.alert('Auction Closed', 'No claims were placed on this item.');
+              }
+              setCompletionStatus('completed');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to close auction. Please try again.');
+              setCompletionStatus('idle');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const { formatted, isEnding, isExpired } = useListingTimer(listing?.auctionEnd ?? null, {
+    onExpired: handleAuctionExpired,
+    listingId: id,
+  });
 
   const placeBidMutation = useMutation({
     mutationFn: async (amount: number) => {
@@ -157,11 +260,35 @@ export default function ListingDetailScreen() {
     setLastTap(now);
   };
 
-  const handleBuyNow = () => {
+  const handleBuyNow = async () => {
     if (!user) {
       Alert.alert('Sign In Required', 'Please sign in to claim this item');
       return;
     }
+
+    // Check if user has a payment method
+    try {
+      const { hasPaymentMethod } = await stripeService.getPaymentMethodStatus();
+
+      if (!hasPaymentMethod) {
+        Alert.alert(
+          'Payment Method Required',
+          'Please add a payment method before placing a claim. Your card will only be charged if you win.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Add Card',
+              onPress: () => router.push(`/add-payment-method?returnTo=/listing/${id}`),
+            },
+          ]
+        );
+        return;
+      }
+    } catch (err) {
+      console.error('Failed to check payment method:', err);
+      // Allow to proceed if check fails - backend will validate
+    }
+
     const claimAmount = (listing?.currentHighBid || listing?.startingBid || 0) + 1;
     placeBidMutation.mutate(claimAmount);
   };
@@ -295,6 +422,19 @@ export default function ListingDetailScreen() {
             </TouchableOpacity>
           )}
 
+          {/* Message Curator Button */}
+          {!isOwnListing && (
+            <TouchableOpacity
+              style={[styles.messageButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={() => router.push(`/messages/${id}`)}
+            >
+              <Ionicons name="chatbubble-outline" size={20} color={colors.text} />
+              <Text style={[styles.messageButtonText, { color: colors.text }]}>
+                Message Curator
+              </Text>
+            </TouchableOpacity>
+          )}
+
           {listing.description && (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -407,6 +547,20 @@ export default function ListingDetailScreen() {
 
           {isOwnListing && (
             <View style={styles.section}>
+              {/* Close Auction Early button - only show for active auctions */}
+              {listing.status === 'active' && !isExpired && (
+                <TouchableOpacity
+                  style={[styles.closeEarlyButton, { borderColor: colors.warning }]}
+                  onPress={handleCuratorCloseEarly}
+                  disabled={completionStatus === 'completing'}
+                >
+                  <Ionicons name="close-circle-outline" size={20} color={colors.warning} />
+                  <Text style={[styles.closeEarlyButtonText, { color: colors.warning }]}>
+                    {completionStatus === 'completing' ? 'Closing...' : 'Close Auction Early'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
                 style={[styles.deleteButton, { borderColor: colors.error }]}
                 onPress={handleDelete}
@@ -587,6 +741,20 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.md,
     fontWeight: '600',
   },
+  messageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  messageButtonText: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: '600',
+  },
   followButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -611,6 +779,20 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   deleteButtonText: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: '600',
+  },
+  closeEarlyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.md,
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  closeEarlyButtonText: {
     fontSize: FONTS.sizes.md,
     fontWeight: '600',
   },

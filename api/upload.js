@@ -19,7 +19,7 @@ function verifyToken(req) {
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '10mb',
+      sizeLimit: '50mb', // Increased for video uploads
     },
   },
 };
@@ -58,8 +58,48 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { image } = req.body;
+    const { image, video, type = 'image' } = req.body;
 
+    // Video upload
+    if (type === 'video' || video) {
+      const videoData = video || image;
+      if (!videoData) {
+        return res.status(400).json({ error: 'No video provided' });
+      }
+
+      // Upload video to Cloudinary
+      const result = await cloudinary.uploader.upload(videoData, {
+        folder: 'nafisas-closet/stories',
+        resource_type: 'video',
+        transformation: [
+          { quality: 'auto:good' },
+          { fetch_format: 'auto' },
+        ],
+        eager: [
+          // Generate thumbnail from video
+          {
+            format: 'jpg',
+            transformation: [
+              { width: 400, height: 400, crop: 'fill' },
+            ],
+          },
+        ],
+        eager_async: false,
+      });
+
+      // Get thumbnail URL from eager transformation
+      const thumbnailUrl = result.eager?.[0]?.secure_url || null;
+
+      return res.json({
+        success: true,
+        url: result.secure_url,
+        thumbnailUrl,
+        publicId: result.public_id,
+        duration: result.duration || 0,
+      });
+    }
+
+    // Image upload (existing logic)
     if (!image) {
       return res.status(400).json({ error: 'No image provided' });
     }

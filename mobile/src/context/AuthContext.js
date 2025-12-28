@@ -13,6 +13,17 @@ const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 
 const AuthContext = createContext(null);
 
+// Check if user profile is complete (has name and bio)
+function checkProfileComplete(user) {
+  if (!user) return false;
+  const hasValidName = user.name &&
+                       user.name.trim() !== '' &&
+                       user.name !== 'Apple User' &&
+                       !user.name.includes('@'); // Exclude email-based names
+  const hasBio = user.bio && user.bio.trim() !== '';
+  return hasValidName && hasBio;
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
@@ -252,6 +263,7 @@ export function AuthProvider({ children }) {
     isLoading,
     isSigningIn,
     isAuthenticated: !!token,
+    isProfileComplete: checkProfileComplete(user),
     pendingInvitationCode,
     setInvitationCode,
     signInWithGoogle,

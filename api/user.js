@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { getUser, updateUser, getCurator, createCurator, isHandleTaken, validateHandle } from '../lib/db.js';
+import { awardEngagementReward } from '../lib/purse.js';
+import { notifyCuratorApplication, sendCuratorWelcomeEmail } from '../lib/email.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 
@@ -50,6 +52,7 @@ export default async function handler(req, res) {
           profilePhoto: user.profile_photo,
           role: user.role,
           bio: user.bio,
+          birthday: user.birthday,
           createdAt: user.created_at
         },
         curator: curator ? {
@@ -68,11 +71,19 @@ export default async function handler(req, res) {
 
     // PUT update user profile
     if (req.method === 'PUT') {
-      const { name, bio, profilePhoto, handle } = req.body;
+      const { name, bio, profilePhoto, handle, birthday } = req.body;
       const updates = {};
       if (name !== undefined) updates.name = name;
       if (bio !== undefined) updates.bio = bio;
       if (profilePhoto !== undefined) updates.profile_photo = profilePhoto;
+      if (birthday !== undefined) {
+        // Validate birthday format (YYYY-MM-DD or null to clear)
+        if (birthday === null) {
+          updates.birthday = null;
+        } else if (/^\d{4}-\d{2}-\d{2}$/.test(birthday)) {
+          updates.birthday = birthday;
+        }
+      }
 
       // Handle validation and update
       if (handle !== undefined) {
@@ -90,6 +101,31 @@ export default async function handler(req, res) {
       }
 
       const user = await updateUser(decoded.userId, updates);
+
+      // Check for engagement rewards (async, don't block response)
+      (async () => {
+        try {
+          // Award profile photo reward
+          if (profilePhoto) {
+            const photoResult = await awardEngagementReward(decoded.userId, 'UPLOAD_PROFILE_PHOTO');
+            if (photoResult.awarded) {
+              console.log(`Awarded profile photo reward of ${photoResult.coins} GC to user ${decoded.userId}`);
+            }
+          }
+
+          // Check if profile is complete (name and bio both set)
+          if (user.name && user.name.trim() !== '' && user.name !== 'Apple User' &&
+              user.bio && user.bio.trim() !== '') {
+            const profileResult = await awardEngagementReward(decoded.userId, 'COMPLETE_PROFILE');
+            if (profileResult.awarded) {
+              console.log(`Awarded complete profile reward of ${profileResult.coins} GC to user ${decoded.userId}`);
+            }
+          }
+        } catch (err) {
+          console.error('Error checking engagement rewards:', err);
+        }
+      })();
+
       return res.json({
         success: true,
         user: {
@@ -100,12 +136,13 @@ export default async function handler(req, res) {
           profilePhoto: user.profile_photo,
           avatarUrl: user.avatar_url || user.profile_photo,
           role: user.role,
-          bio: user.bio
+          bio: user.bio,
+          birthday: user.birthday
         }
       });
     }
 
-    // POST become a curator
+    // POST become a curator or register push token
     if (req.method === 'POST') {
       const { action } = req.body;
 
@@ -116,6 +153,23 @@ export default async function handler(req, res) {
         }
 
         const curator = await createCurator(decoded.userId);
+
+        // Send email notifications (async, don't block)
+        notifyCuratorApplication(user, curator)
+          .then(result => {
+            if (result.success) console.log('Curator application email sent to admin');
+          })
+          .catch(err => console.error('Error sending curator application email:', err));
+
+        // Send welcome email if auto-approved
+        if (curator.approved) {
+          sendCuratorWelcomeEmail(user, curator)
+            .then(result => {
+              if (result.success) console.log(`Welcome email sent to new curator ${user.email}`);
+            })
+            .catch(err => console.error('Error sending curator welcome email:', err));
+        }
+
         return res.json({
           success: true,
           message: 'Curator application submitted',
@@ -124,6 +178,32 @@ export default async function handler(req, res) {
             approved: curator.approved
           }
         });
+      }
+
+      if (action === 'register-push-token') {
+        const { pushToken } = req.body;
+
+        if (!pushToken) {
+          return res.status(400).json({ error: 'Missing pushToken' });
+        }
+
+        // Validate Expo push token format
+        if (!pushToken.startsWith('ExponentPushToken[')) {
+          return res.status(400).json({ error: 'Invalid push token format' });
+        }
+
+        await updateUser(decoded.userId, { push_token: pushToken });
+
+        // Award engagement reward for enabling notifications (async)
+        awardEngagementReward(decoded.userId, 'ENABLE_NOTIFICATIONS')
+          .then(result => {
+            if (result.awarded) {
+              console.log(`Awarded notifications reward of ${result.coins} GC to user ${decoded.userId}`);
+            }
+          })
+          .catch(err => console.error('Error awarding notifications reward:', err));
+
+        return res.json({ success: true, message: 'Push token registered' });
       }
 
       return res.status(400).json({ error: 'Invalid action' });

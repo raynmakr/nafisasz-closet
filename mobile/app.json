@@ -6,22 +6,46 @@
     "orientation": "portrait",
     "scheme": "nafisascloset",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
     "splash": {
-      "backgroundColor": "#FFFFFF",
+      "backgroundColor": "#1A0A2E",
       "image": "./assets/nc-logo.png",
       "resizeMode": "contain"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nafisascloset.app",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to record hunt stories and take product photos.",
+        "NSMicrophoneUsageDescription": "This app uses the microphone to record audio for hunt stories.",
+        "NSPhotoLibraryUsageDescription": "This app accesses your photos to upload product images and stories.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#000000"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1A0A2E"
       },
-      "package": "com.nafisascloset.app"
+      "package": "com.nafisascloset.app",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -29,10 +53,49 @@
     },
     "plugins": [
       "expo-router",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#1A0A2E"
+        }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.nafisascloset.app",
+          "enableGooglePay": true
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to record hunt stories."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone for video recording."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "cdd3a4b9-c0dc-4701-a119-933d1cf82d76"
+      },
+      "router": {}
+    },
+    "owner": "raynmakr",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/cdd3a4b9-c0dc-4701-a119-933d1cf82d76"
     }
   }
 }

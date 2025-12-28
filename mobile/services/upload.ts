@@ -6,6 +6,14 @@ export interface UploadResult {
   publicId: string;
 }
 
+export interface VideoUploadResult {
+  success: boolean;
+  url: string;
+  thumbnailUrl: string | null;
+  publicId: string;
+  duration: number;
+}
+
 /**
  * Convert a local file URI to base64
  */
@@ -66,5 +74,28 @@ export const uploadService = {
     }
 
     return urls;
+  },
+
+  /**
+   * Upload a video to Cloudinary
+   * @param videoUri - Local file URI from video picker
+   * @returns Promise with the uploaded video URL and thumbnail
+   */
+  async uploadVideo(videoUri: string): Promise<VideoUploadResult> {
+    // Convert file to base64 data URI
+    const dataUri = await fileToBase64(videoUri);
+
+    // Upload to API (5 minute timeout for large videos)
+    const result = await api.post<VideoUploadResult>(
+      '/upload',
+      { video: dataUri, type: 'video' },
+      { timeout: 300000 }
+    );
+
+    if (!result.success || !result.url) {
+      throw new Error('Video upload failed');
+    }
+
+    return result;
   },
 };

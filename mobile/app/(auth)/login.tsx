@@ -17,7 +17,7 @@ import { invitationService } from '@/services/invitation';
 
 export default function LoginScreen() {
   const colors = useThemeColors();
-  const { signInWithApple, canUseAppleAuth, isLoading, isAuthenticated, user, pendingInvitationCode, setInvitationCode } = useAuth();
+  const { signInWithApple, canUseAppleAuth, isLoading, isAuthenticated, isProfileComplete, user, pendingInvitationCode, setInvitationCode } = useAuth();
   const [signingIn, setSigningIn] = useState(false);
   const [appleAuthAvailable, setAppleAuthAvailable] = useState(false);
   const [invitationCode, setLocalInvitationCode] = useState('');
@@ -42,9 +42,13 @@ export default function LoginScreen() {
   // Navigate when authentication succeeds
   useEffect(() => {
     if (isAuthenticated && user) {
-      router.replace('/(tabs)');
+      if (isProfileComplete) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/(auth)/complete-profile');
+      }
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, isProfileComplete]);
 
   const validateCode = async (code: string) => {
     if (!code || code.length < 6) {

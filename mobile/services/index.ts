@@ -7,3 +7,6 @@ export { socketService } from './socket';
 export { uploadService } from './upload';
 export { stripeService } from './stripe';
 export { transactionsService } from './transactions';
+export { auctionService } from './auctionService';
+export { messagesService } from './messages';
+export { purseService } from './purse';

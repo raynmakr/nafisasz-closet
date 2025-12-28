@@ -1,5 +1,10 @@
 import { verifyWebhookSignature } from '../../lib/stripe.js';
 import { query } from '../../lib/db.js';
+import {
+  notifyCuratorPaymentReceived,
+  notifyBuyerPaymentFailed,
+  notifyAdminDispute,
+} from '../../lib/notifications.js';
 
 // Disable body parsing for webhook signature verification
 export const config = {
@@ -128,7 +133,14 @@ async function handlePaymentIntentSucceeded(paymentIntent) {
     const tx = txResult.rows[0];
     console.log(`Transaction ${tx.id} marked as paid for listing: ${tx.listing_title}`);
 
-    // TODO: Send push notification to curator to purchase the item
+    // Send push notification to curator to purchase the item
+    await notifyCuratorPaymentReceived(
+      tx.curator_id,
+      tx.id,
+      tx.listing_title,
+      tx.buyer_name,
+      parseFloat(tx.final_price)
+    );
   }
 }
 
@@ -153,7 +165,21 @@ async function handlePaymentIntentFailed(paymentIntent) {
     [transactionId, paymentIntent.id]
   );
 
-  // TODO: Send notification to buyer about payment failure
+  // Get transaction details for notification
+  const txResult = await query(
+    `SELECT t.*, l.title as listing_title
+     FROM transactions t
+     JOIN listings l ON t.listing_id = l.id
+     WHERE t.id = $1`,
+    [transactionId]
+  );
+
+  if (txResult.rows[0]) {
+    const tx = txResult.rows[0];
+    // Send notification to buyer about payment failure
+    await notifyBuyerPaymentFailed(tx.buyer_id, tx.id, tx.listing_title);
+  }
+
   console.log(`Payment failed for transaction ${transactionId}`);
 }
 
@@ -193,14 +219,19 @@ async function handleDisputeCreated(dispute) {
     return;
   }
 
-  // Update transaction status
-  await query(
+  // Update transaction status and get transaction ID
+  const updateResult = await query(
     `UPDATE transactions
      SET status = 'disputed', updated_at = CURRENT_TIMESTAMP
-     WHERE payment_intent_id = $1`,
+     WHERE payment_intent_id = $1
+     RETURNING id`,
     [paymentIntentId]
   );
 
-  // TODO: Notify admin about dispute
+  const transactionId = updateResult.rows[0]?.id;
+
+  // Notify admin about dispute
+  await notifyAdminDispute(paymentIntentId, transactionId);
+
   console.log(`Dispute created for payment ${paymentIntentId}`);
 }

@@ -7,7 +7,7 @@ const LOGO = require('../assets/nc-logo.png');
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function Index() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isProfileComplete } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
 
   // Animation values
@@ -73,7 +73,11 @@ export default function Index() {
 
   // After splash, redirect based on auth state
   if (isAuthenticated) {
-    return <Redirect href="/(tabs)" />;
+    if (isProfileComplete) {
+      return <Redirect href="/(tabs)" />;
+    } else {
+      return <Redirect href="/(auth)/complete-profile" />;
+    }
   }
 
   return <Redirect href="/(auth)/login" />;

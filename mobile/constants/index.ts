@@ -2,6 +2,7 @@ export * from './colors';
 
 export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 export const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3000';
+export const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
 
 export const AUCTION_DURATIONS = {
   THIRTY_MINUTES: { label: '30 minutes', ms: 30 * 60 * 1000 },

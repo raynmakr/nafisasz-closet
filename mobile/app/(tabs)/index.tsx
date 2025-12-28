@@ -13,11 +13,14 @@ import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { listingsService } from '@/services';
+import { storiesService, StoryCurator } from '@/services/stories';
 import { useLikesStore } from '@/stores';
 import { useAuth } from '@/src/context/AuthContext';
 import { useThemeColors, useListingTimer } from '@/hooks';
 import { SPACING, FONTS, BORDER_RADIUS } from '@/constants';
 import { Listing } from '@/types';
+import { StoryCircles } from '@/components/StoryCircles';
+import { StoryViewer } from '@/components/StoryViewer';
 
 function ListingCard({ listing }: { listing: Listing }) {
   const colors = useThemeColors();
@@ -149,6 +152,8 @@ function ListingCard({ listing }: { listing: Listing }) {
 export default function DiscoverScreen() {
   const colors = useThemeColors();
   const [refreshing, setRefreshing] = useState(false);
+  const [storyViewerVisible, setStoryViewerVisible] = useState(false);
+  const [selectedCuratorIndex, setSelectedCuratorIndex] = useState(0);
   const { user } = useAuth();
   const isCurator = user?.curator?.approved === true;
 
@@ -161,11 +166,24 @@ export default function DiscoverScreen() {
     queryFn: () => listingsService.getListings({ status: 'ACTIVE', limit: 20 }),
   });
 
+  const {
+    data: storyCurators,
+    refetch: refetchStories,
+  } = useQuery({
+    queryKey: ['stories'],
+    queryFn: () => storiesService.getStories(),
+  });
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
+    await Promise.all([refetch(), refetchStories()]);
     setRefreshing(false);
-  }, [refetch]);
+  }, [refetch, refetchStories]);
+
+  const handleStoryPress = (curatorIndex: number) => {
+    setSelectedCuratorIndex(curatorIndex);
+    setStoryViewerVisible(true);
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -194,6 +212,21 @@ export default function DiscoverScreen() {
         keyExtractor={(item) => String(item.id)}
         renderItem={({ item }) => <ListingCard listing={item} />}
         contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          storyCurators && storyCurators.length > 0 ? (
+            <StoryCircles
+              curators={storyCurators}
+              onStoryPress={handleStoryPress}
+              onAddPress={() => router.push('/story/create')}
+            />
+          ) : isCurator ? (
+            <StoryCircles
+              curators={[]}
+              onStoryPress={() => {}}
+              onAddPress={() => router.push('/story/create')}
+            />
+          ) : null
+        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -208,6 +241,17 @@ export default function DiscoverScreen() {
             </Text>
           </View>
         }
+      />
+
+      {/* Story Viewer Modal */}
+      <StoryViewer
+        visible={storyViewerVisible}
+        curators={storyCurators || []}
+        initialCuratorIndex={selectedCuratorIndex}
+        onClose={() => {
+          setStoryViewerVisible(false);
+          refetchStories(); // Refresh to update viewed status
+        }}
       />
     </View>
   );

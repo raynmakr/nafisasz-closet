@@ -177,38 +177,53 @@ export default function CuratorProfileScreen() {
             </View>
 
             {!isOwnProfile && (
-              <TouchableOpacity
-                style={[
-                  styles.followButton,
-                  {
-                    backgroundColor: isFollowing ? colors.surface : colors.accent,
-                    borderColor: colors.accent,
-                    borderWidth: isFollowing ? 1 : 0,
-                  },
-                ]}
-                onPress={() => {
-                  if (!user) {
-                    Alert.alert('Sign In Required', 'Please sign in to follow curators');
-                    return;
-                  }
-                  followMutation.mutate();
-                }}
-                disabled={followMutation.isPending}
-              >
-                <Ionicons
-                  name={isFollowing ? 'checkmark' : 'person-add-outline'}
-                  size={20}
-                  color={isFollowing ? colors.accent : colors.background}
-                />
-                <Text
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
                   style={[
-                    styles.followButtonText,
-                    { color: isFollowing ? colors.accent : colors.background },
+                    styles.followButton,
+                    {
+                      backgroundColor: isFollowing ? colors.surface : colors.accent,
+                      borderColor: colors.accent,
+                      borderWidth: isFollowing ? 1 : 0,
+                    },
                   ]}
+                  onPress={() => {
+                    if (!user) {
+                      Alert.alert('Sign In Required', 'Please sign in to follow curators');
+                      return;
+                    }
+                    followMutation.mutate();
+                  }}
+                  disabled={followMutation.isPending}
                 >
-                  {followMutation.isPending ? 'Processing...' : isFollowing ? 'Following' : 'Follow'}
-                </Text>
-              </TouchableOpacity>
+                  <Ionicons
+                    name={isFollowing ? 'checkmark' : 'person-add-outline'}
+                    size={20}
+                    color={isFollowing ? colors.accent : colors.background}
+                  />
+                  <Text
+                    style={[
+                      styles.followButtonText,
+                      { color: isFollowing ? colors.accent : colors.background },
+                    ]}
+                  >
+                    {followMutation.isPending ? 'Processing...' : isFollowing ? 'Following' : 'Follow'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.messageButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => {
+                    if (!user) {
+                      Alert.alert('Sign In Required', 'Please sign in to message curators');
+                      return;
+                    }
+                    router.push(`/messages/dm/${curator.userId}`);
+                  }}
+                >
+                  <Ionicons name="chatbubble-outline" size={20} color={colors.text} />
+                </TouchableOpacity>
+              </View>
             )}
 
             <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
@@ -277,18 +292,31 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.sm,
     marginTop: 2,
   },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING.lg,
+    gap: SPACING.sm,
+  },
   followButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.full,
-    marginTop: SPACING.lg,
     gap: SPACING.xs,
   },
   followButtonText: {
     fontSize: FONTS.sizes.md,
     fontWeight: '600',
+  },
+  messageButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
   },
   sectionTitle: {
     fontSize: FONTS.sizes.sm,

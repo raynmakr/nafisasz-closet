@@ -2,7 +2,19 @@
   "crons": [
     {
       "path": "/api/cron/check-auctions",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/auto-confirm-deliveries",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/birthday-rewards",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-stories",
+      "schedule": "0 0 * * *"
     }
   ]
 }

@@ -20,8 +20,13 @@ import { Listing } from '@/types';
 function MyListingCard({ listing, onDelete }: { listing: Listing; onDelete: (id: string) => void }) {
   const colors = useThemeColors();
   const { formatted, isEnding } = useListingTimer(listing.auctionEnd);
-  const isActive = listing.status === 'active';
-  const statusColor = isActive ? colors.accent : colors.textMuted;
+  const isActive = listing.status === 'active' || listing.status === 'ACTIVE';
+  const isDraft = listing.status === 'draft' || listing.status === 'DRAFT';
+  const statusColor = isActive ? colors.accent : isDraft ? colors.warning || '#F59E0B' : colors.textMuted;
+
+  const handleEdit = () => {
+    router.push(`/listing/edit/${listing.id}`);
+  };
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }]}>
@@ -61,12 +66,22 @@ function MyListingCard({ listing, onDelete }: { listing: Listing; onDelete: (id:
           </Text>
         </View>
       </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.deleteButton, { backgroundColor: colors.error }]}
-        onPress={() => onDelete(listing.id)}
-      >
-        <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
-      </TouchableOpacity>
+      <View style={styles.actionButtons}>
+        {isDraft && (
+          <TouchableOpacity
+            style={[styles.editButton, { backgroundColor: colors.accent }]}
+            onPress={handleEdit}
+          >
+            <Ionicons name="pencil-outline" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[styles.deleteButton, { backgroundColor: colors.error }]}
+          onPress={() => onDelete(listing.id)}
+        >
+          <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -237,7 +252,17 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.md,
     fontWeight: '600',
   },
+  actionButtons: {
+    flexDirection: 'column',
+  },
+  editButton: {
+    flex: 1,
+    width: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   deleteButton: {
+    flex: 1,
     width: 50,
     justifyContent: 'center',
     alignItems: 'center',

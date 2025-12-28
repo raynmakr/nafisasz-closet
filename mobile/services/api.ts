@@ -35,14 +35,20 @@ class ApiClient {
     // Response interceptor - handle errors
     this.client.interceptors.response.use(
       (response) => response,
-      async (error: AxiosError<{ error?: string; message?: string }>) => {
+      async (error: AxiosError<{ error?: string | object; message?: string }>) => {
         if (error.response?.status === 401) {
           // Token expired or invalid - clear it
           await this.clearToken();
         }
         // Extract error message from response body
-        const message = error.response?.data?.error || error.response?.data?.message || error.message;
-        const enhancedError = new Error(message);
+        let message = error.response?.data?.error || error.response?.data?.message || error.message;
+
+        // Handle case where error is an object
+        if (typeof message === 'object') {
+          message = JSON.stringify(message);
+        }
+
+        const enhancedError = new Error(message || 'An error occurred');
         return Promise.reject(enhancedError);
       }
     );

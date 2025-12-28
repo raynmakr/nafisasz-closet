@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { initDatabase, findOrCreateUser, getUser } from '../lib/db.js';
+import { awardWelcomeBonus, awardReferralSignupBonus } from '../lib/purse.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 const JWT_EXPIRY = '30d';
@@ -105,6 +106,29 @@ export default async function handler(req, res) {
 
       // Find or create user (with invitation code if provided)
       const user = await findOrCreateUser(provider, providerId, email, name, avatarUrl, invitationCode);
+
+      // Award welcome bonus and referral bonus for new users (async, don't block)
+      if (user._isNewUser) {
+        (async () => {
+          try {
+            // Award welcome bonus to new user
+            const welcomeResult = await awardWelcomeBonus(user.id);
+            if (welcomeResult.awarded) {
+              console.log(`Awarded welcome bonus of ${welcomeResult.coins} GC to user ${user.id}`);
+            }
+
+            // Award referral signup bonus if they signed up via referral
+            if (user._referrerId) {
+              const referralResult = await awardReferralSignupBonus(user.id, user._referrerId);
+              if (referralResult.awarded) {
+                console.log(`Awarded referral signup bonus of ${referralResult.coins} GC to user ${user.id}`);
+              }
+            }
+          } catch (err) {
+            console.error('Error awarding signup bonuses:', err);
+          }
+        })();
+      }
 
       // Generate JWT
       const token = jwt.sign(

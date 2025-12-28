@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
-import { getActiveListings, getListing, createListing, publishListing, getCurator, getListingBids } from '../lib/db.js';
+import { getActiveListings, getListing, createListing, updateListing, publishListing, getCurator, getListingBids, query } from '../lib/db.js';
+import { notifyFollowersNewListing } from '../lib/notifications.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 
@@ -18,7 +19,7 @@ function verifyToken(req) {
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
@@ -81,6 +82,20 @@ export default async function handler(req, res) {
           return res.status(404).json({ error: 'Listing not found' });
         }
 
+        // Notify followers about new listing
+        const curatorInfo = await query(
+          `SELECT u.id as user_id, u.name FROM curators c JOIN users u ON c.user_id = u.id WHERE c.id = $1`,
+          [listing.curator_id]
+        );
+        if (curatorInfo.rows[0]) {
+          notifyFollowersNewListing(
+            curatorInfo.rows[0].user_id,
+            curatorInfo.rows[0].name || 'A curator',
+            listing.id,
+            listing.title
+          ).catch((err) => console.error('Failed to send new listing notifications:', err));
+        }
+
         return res.json({ success: true, listing: formatListing(listing) });
       }
 
@@ -115,6 +130,32 @@ export default async function handler(req, res) {
       });
 
       return res.json({ success: true, listing: formatListing(listing) });
+    }
+
+    // PUT update listing (draft only)
+    if (req.method === 'PUT') {
+      const decoded = verifyToken(req);
+      if (!decoded) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const { id, ...updates } = req.body;
+      if (!id) {
+        return res.status(400).json({ error: 'Missing listing id' });
+      }
+
+      // Verify user is a curator
+      const curator = await getCurator(decoded.userId);
+      if (!curator) {
+        return res.status(403).json({ error: 'Must be a curator to update listings' });
+      }
+
+      try {
+        const listing = await updateListing(id, curator.id, updates);
+        return res.json({ success: true, listing: formatListing(listing) });
+      } catch (error) {
+        return res.status(400).json({ error: error.message });
+      }
     }
 
     // DELETE listing

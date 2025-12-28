@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
-import { getApprovedCurators, getCuratorById, followCurator, unfollowCurator, isFollowing, createCurator, getCurator, query, searchCurators, getFollowedCurators } from '../lib/db.js';
+import { getApprovedCurators, getCuratorById, followCurator, unfollowCurator, isFollowing, createCurator, getCurator, query, searchCurators, getFollowedCurators, getUser } from '../lib/db.js';
+import { checkCuratorFollowerMilestone } from '../lib/purse.js';
+import { notifyCuratorApplication, sendCuratorWelcomeEmail } from '../lib/email.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 
@@ -153,6 +155,21 @@ export default async function handler(req, res) {
         // Create curator and auto-approve for now (MVP)
         const curator = await createCurator(decoded.userId);
         await query('UPDATE curators SET approved = TRUE WHERE id = $1', [curator.id]);
+        curator.approved = true;
+
+        // Send email notifications (async, don't block)
+        const user = await getUser(decoded.userId);
+        notifyCuratorApplication(user, curator)
+          .then(result => {
+            if (result.success) console.log('Curator application email sent to admin');
+          })
+          .catch(err => console.error('Error sending curator application email:', err));
+
+        sendCuratorWelcomeEmail(user, curator)
+          .then(result => {
+            if (result.success) console.log(`Welcome email sent to new curator ${user.email}`);
+          })
+          .catch(err => console.error('Error sending curator welcome email:', err));
 
         return res.json({
           success: true,
@@ -167,6 +184,16 @@ export default async function handler(req, res) {
       }
 
       await followCurator(decoded.userId, curatorUserId);
+
+      // Check if curator reached 100 followers milestone (async, don't block)
+      checkCuratorFollowerMilestone(curatorUserId)
+        .then(result => {
+          if (result.awarded) {
+            console.log(`Awarded 100 followers milestone of ${result.coins} GC to curator ${curatorUserId}`);
+          }
+        })
+        .catch(err => console.error('Error checking follower milestone:', err));
+
       return res.json({ success: true, message: 'Now following curator' });
     }
 

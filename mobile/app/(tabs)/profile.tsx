@@ -309,13 +309,14 @@ export default function ProfileScreen() {
 
   const menuItems = [
     { icon: 'person-outline', label: 'Edit Profile', onPress: () => showComingSoon('Edit Profile') },
+    { icon: 'bag-outline', label: 'Orders', onPress: () => router.push('/orders') },
     ...(isCurator ? [{
       icon: 'wallet-outline',
       label: stripeStatus?.onboardingComplete ? 'Payment Setup ✓' : 'Payment Setup',
       onPress: handleStripeSetup,
       highlight: !stripeStatus?.onboardingComplete,
     }] : []),
-    { icon: 'card-outline', label: 'Payment Methods', onPress: () => showComingSoon('Payment Methods') },
+    { icon: 'card-outline', label: 'Payment Methods', onPress: () => router.push('/add-payment-method') },
     { icon: 'location-outline', label: 'Shipping Addresses', onPress: () => showComingSoon('Shipping Addresses') },
     { icon: 'notifications-outline', label: 'Notifications', onPress: () => showComingSoon('Notifications') },
     { icon: 'help-circle-outline', label: 'Help & Support', onPress: () => showComingSoon('Help & Support') },

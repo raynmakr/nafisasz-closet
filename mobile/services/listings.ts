@@ -50,8 +50,8 @@ export const listingsService = {
   },
 
   async updateListing(id: string, input: Partial<CreateListingInput>): Promise<Listing> {
-    const response = await api.put<ApiResponse<Listing>>(`/listings/${id}`, input);
-    return response.data!;
+    const response = await api.put<{ success: boolean; listing: Listing }>('/listings', { id, ...input });
+    return response.listing;
   },
 
   async publishListing(id: string): Promise<Listing> {

@@ -6,7 +6,16 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Linking from 'expo-linking';
+import Constants from 'expo-constants';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
+import { usePushNotifications } from '../hooks';
+
+// Check if we're running in Expo Go (no native modules available)
+const isExpoGo = Constants.appOwnership === 'expo';
+
+if (isExpoGo) {
+  console.log('[Expo Go] Stripe disabled. Use a development build for payment features.');
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -16,6 +25,16 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Component to handle push notifications inside AuthProvider
+function PushNotificationHandler({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+
+  // Initialize push notifications - will register token when authenticated
+  usePushNotifications(isAuthenticated);
+
+  return <>{children}</>;
+}
 
 // Component to handle deep links inside AuthProvider
 function DeepLinkHandler({ children }: { children: React.ReactNode }) {
@@ -74,49 +93,109 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
-        <DeepLinkHandler>
-          <QueryClientProvider client={queryClient}>
-            <StatusBar style="light" />
-            <Stack>
-              <Stack.Screen name="index" options={{ headerShown: false }} />
-              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false, headerBackTitle: 'Back' }} />
-              <Stack.Screen
-                name="listing/[id]"
-                options={{
-                  headerShown: true,
-                  title: '',
-                  headerStyle: { backgroundColor: '#1A0A2E' },
-                  headerTintColor: '#FFFFFF',
-                  headerBackTitleVisible: false,
-                  headerShadowVisible: false,
-                }}
-              />
-              <Stack.Screen
-                name="curator/[id]"
-                options={{
-                  headerShown: true,
-                  title: '',
-                  headerStyle: { backgroundColor: '#1A0A2E' },
-                  headerTintColor: '#FFFFFF',
-                  headerBackTitleVisible: false,
-                  headerShadowVisible: false,
-                }}
-              />
-              <Stack.Screen
-                name="my-posts"
-                options={{
-                  headerShown: true,
-                  title: 'My Posts',
-                  headerStyle: { backgroundColor: '#1A0A2E' },
-                  headerTintColor: '#FFFFFF',
-                  headerBackTitleVisible: false,
-                  headerShadowVisible: false,
-                }}
-              />
-            </Stack>
-          </QueryClientProvider>
-        </DeepLinkHandler>
+        <PushNotificationHandler>
+          <DeepLinkHandler>
+            <QueryClientProvider client={queryClient}>
+              <StatusBar style="light" />
+                <Stack>
+                  <Stack.Screen name="index" options={{ headerShown: false }} />
+                  <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false, headerBackTitle: 'Back' }} />
+                  <Stack.Screen
+                    name="listing/[id]"
+                    options={{
+                      headerShown: true,
+                      title: '',
+                      headerStyle: { backgroundColor: '#1A0A2E' },
+                      headerTintColor: '#FFFFFF',
+                      headerBackTitleVisible: false,
+                      headerShadowVisible: false,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="curator/[id]"
+                    options={{
+                      headerShown: true,
+                      title: '',
+                      headerStyle: { backgroundColor: '#1A0A2E' },
+                      headerTintColor: '#FFFFFF',
+                      headerBackTitleVisible: false,
+                      headerShadowVisible: false,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="my-posts"
+                    options={{
+                      headerShown: true,
+                      title: 'My Posts',
+                      headerStyle: { backgroundColor: '#1A0A2E' },
+                      headerTintColor: '#FFFFFF',
+                      headerBackTitleVisible: false,
+                      headerShadowVisible: false,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="payment/[transactionId]"
+                    options={{
+                      headerShown: true,
+                      title: 'Complete Payment',
+                      headerStyle: { backgroundColor: '#1A0A2E' },
+                      headerTintColor: '#FFFFFF',
+                      headerBackTitleVisible: false,
+                      headerShadowVisible: false,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="add-payment-method"
+                    options={{
+                      headerShown: false,
+                      presentation: 'modal',
+                    }}
+                  />
+                  <Stack.Screen
+                    name="orders"
+                    options={{
+                      headerShown: true,
+                      title: 'Orders',
+                      headerStyle: { backgroundColor: '#1A0A2E' },
+                      headerTintColor: '#FFFFFF',
+                      headerBackTitleVisible: false,
+                      headerShadowVisible: false,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="order/[id]"
+                    options={{
+                      headerShown: true,
+                      title: 'Order Details',
+                      headerStyle: { backgroundColor: '#1A0A2E' },
+                      headerTintColor: '#FFFFFF',
+                      headerBackTitleVisible: false,
+                      headerShadowVisible: false,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="messages/index"
+                    options={{
+                      headerShown: false,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="messages/[listingId]"
+                    options={{
+                      headerShown: false,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="messages/dm/[userId]"
+                    options={{
+                      headerShown: false,
+                    }}
+                  />
+                </Stack>
+            </QueryClientProvider>
+          </DeepLinkHandler>
+        </PushNotificationHandler>
       </AuthProvider>
     </GestureHandlerRootView>
   );
