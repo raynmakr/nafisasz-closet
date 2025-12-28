@@ -1,0 +1,14 @@
+# Mobile app (deployed separately via EAS)
+mobile/
+mobile/node_modules/
+mobile/ios/
+mobile/android/
+
+# Build artifacts
+*.ipa
+*.apk
+*.aab
+
+# Local files
+.env.local
+.DS_Store

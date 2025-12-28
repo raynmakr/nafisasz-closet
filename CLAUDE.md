@@ -5,8 +5,9 @@
 - **Domain:** nafisaszcloset.com (temporary)
 - **Version:** 1.0 MVP
 - **Type:** Mobile marketplace app (iOS + Android)
-- **Stage:** Phase 2 - Active Development
-- **Last Updated:** 2025-12-27 (Hunt Stories feature added)
+- **Stage:** Phase 3 - App Store Preparation
+- **Last Updated:** 2025-12-28 (EAS builds, GitHub repo)
+- **GitHub:** https://github.com/raynmakr/nafisasz-closet
 
 ## CURRENT STATUS
 
@@ -108,14 +109,97 @@
   - [x] Mobile: Stories integrated at top of Discover feed
   - [x] Stories expire after 7 days
   - [x] Only curators can post stories
+- [x] EAS Build Setup - iOS development builds
+  - [x] eas.json with development, development-device, preview, production profiles
+  - [x] Square app icons (1024x1024)
+  - [x] expo-notifications plugin configured
+  - [x] Stripe React Native SDK (v0.50.3 - Expo SDK 54 compatible)
+  - [x] APNs key configured for push notifications
+  - [x] Successful iOS simulator build
+  - [x] Physical device builds via Xcode
+- [x] Invitation/Referral System
+  - [x] API: `/api/user/invitation` - Get user's invite code
+  - [x] API: `/api/invitation/validate` - Validate invite codes
+  - [x] Mobile: Invite friends screen with shareable code/link
 
 ### Known Issues
 - [ ] Domain nafisaszcloset.com not fully configured (Wix DNS conflict)
+- [ ] Push token registration may fail on first launch (non-blocking)
 
 ## NEXT STEPS
 
+### Immediate Priority
+1. **Stripe Integration Completion**
+   - [ ] Test full payment flow end-to-end on physical device
+   - [ ] Verify pre-authorization capture on auction end
+   - [ ] Test Stripe Connect curator payouts
+   - [ ] Configure production Stripe keys
+   - [ ] Set up Stripe webhooks for production
+
+2. **Shipping Integration**
+   - [ ] Choose shipping provider (Shippo, EasyPost, or ShipEngine)
+   - [ ] Implement shipping label generation API
+   - [ ] Add shipping cost calculation at checkout
+   - [ ] Integrate tracking number updates
+   - [ ] Shipping notifications to buyer
+
+3. **API Server Migration (Cloud)**
+   - [ ] Choose cloud provider (Railway, Render, AWS, or DigitalOcean)
+   - [ ] Set up PostgreSQL database (managed)
+   - [ ] Set up Redis for caching/sessions
+   - [ ] Configure environment variables
+   - [ ] Set up CI/CD pipeline
+   - [ ] Migrate from Vercel serverless to persistent server
+   - [ ] Update mobile app API_URL
+
+### App Store Submission
+4. **TestFlight / App Store**
+   - [ ] Build with `preview` profile for TestFlight
+   - [ ] Submit to App Store Connect
+   - [ ] Beta testing with internal testers
+   - [ ] App Store screenshots and metadata
+   - [ ] Privacy policy and terms of service
+   - [ ] Production release
+
 ### Future
-1. **VIP Buyer Subscription** - Early access to listings ($19/mo)
+5. **VIP Buyer Subscription** - Early access to listings ($19/mo)
+
+## EAS BUILD COMMANDS
+
+### Development (iOS Simulator)
+```bash
+cd mobile
+npx eas build --profile development --platform ios
+```
+
+### Development (Physical Device)
+```bash
+npx eas build --profile development-device --platform ios
+# Requires Apple Developer credentials - will prompt for login
+```
+
+### TestFlight (Beta Testing)
+```bash
+npx eas build --profile preview --platform ios
+npx eas submit --platform ios --latest
+```
+
+### Production (App Store)
+```bash
+npx eas build --profile production --platform ios
+npx eas submit --platform ios --latest
+```
+
+### Device Registration
+```bash
+npx eas device:create    # Register single device
+npx eas device:list      # List registered devices
+```
+
+### Local Development
+```bash
+npx expo start --dev-client   # Start Metro for development builds
+```
 
 ## TODO / PENDING SETUP
 - [x] **Stripe Connect** - Marketplace payments for curators (implemented)
@@ -124,6 +208,7 @@
 - [x] **Purse & Gold Coins** - Loyalty rewards system (implemented)
 - [x] **CRON_SECRET** - Added to Vercel environment (production, preview, development)
 - [x] **Resend Email Setup** - Email notifications (requires RESEND_API_KEY in Vercel)
+- [x] **EAS Build** - iOS builds configured (development, preview, production profiles)
 
 ## STRIPE CONNECT SETUP
 
