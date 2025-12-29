@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { initDatabase, findOrCreateUser, getUser } from '../lib/db.js';
+import { initDatabase, findOrCreateUser, getUser, getCurator } from '../lib/db.js';
 import { awardWelcomeBonus, awardReferralSignupBonus } from '../lib/purse.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
@@ -42,6 +42,10 @@ export default async function handler(req, res) {
         if (!user) {
           return res.status(401).json({ error: 'User not found' });
         }
+
+        // Get curator info if user is a curator
+        const curator = await getCurator(user.id);
+
         return res.json({
           valid: true,
           user: {
@@ -53,7 +57,12 @@ export default async function handler(req, res) {
             profilePhoto: user.profile_photo,
             role: user.role,
             bio: user.bio,
-            createdAt: user.created_at
+            createdAt: user.created_at,
+            curator: curator ? {
+              id: curator.id,
+              approved: curator.approved,
+              subscriptionTier: curator.subscription_tier
+            } : null
           }
         });
       } catch (err) {
@@ -137,6 +146,9 @@ export default async function handler(req, res) {
         { expiresIn: JWT_EXPIRY }
       );
 
+      // Get curator info if user is a curator
+      const curator = await getCurator(user.id);
+
       return res.json({
         success: true,
         token,
@@ -148,7 +160,12 @@ export default async function handler(req, res) {
           avatarUrl: user.avatar_url,
           profilePhoto: user.profile_photo,
           role: user.role,
-          createdAt: user.created_at
+          createdAt: user.created_at,
+          curator: curator ? {
+            id: curator.id,
+            approved: curator.approved,
+            subscriptionTier: curator.subscription_tier
+          } : null
         }
       });
     }
