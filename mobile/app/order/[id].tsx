@@ -46,6 +46,10 @@ const STATUS_COLORS: Record<TransactionStatus, string> = {
 
 interface OrderDetailData extends Transaction {
   curator_user_id?: number;
+  tracking_url?: string;
+  label_url?: string;
+  shipping_carrier?: string;
+  shipping_service?: string;
 }
 
 export default function OrderDetailScreen() {
@@ -166,7 +170,13 @@ export default function OrderDetailScreen() {
   const handleTrackPackage = () => {
     if (!order?.tracking_number) return;
 
-    // Try to detect carrier and open tracking URL
+    // Use Shippo's tracking URL if available
+    if (order.tracking_url) {
+      Linking.openURL(order.tracking_url);
+      return;
+    }
+
+    // Fallback: Try to detect carrier and open tracking URL
     const tracking = order.tracking_number.toUpperCase();
     let url = '';
 
@@ -181,6 +191,12 @@ export default function OrderDetailScreen() {
     }
 
     Linking.openURL(url);
+  };
+
+  const handleViewLabel = () => {
+    if (order?.label_url) {
+      Linking.openURL(order.label_url);
+    }
   };
 
   const handlePayNow = () => {
@@ -300,10 +316,17 @@ export default function OrderDetailScreen() {
         {order.tracking_number && (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Shipping</Text>
+            {order.shipping_carrier && (
+              <View style={styles.shippingInfo}>
+                <Text style={[styles.carrierText, { color: colors.text }]}>
+                  {order.shipping_carrier} {order.shipping_service ? `- ${order.shipping_service}` : ''}
+                </Text>
+              </View>
+            )}
             <View style={styles.trackingRow}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={[styles.trackingLabel, { color: colors.textMuted }]}>Tracking Number</Text>
-                <Text style={[styles.trackingNumber, { color: colors.text }]}>{order.tracking_number}</Text>
+                <Text style={[styles.trackingNumber, { color: colors.text }]} selectable>{order.tracking_number}</Text>
               </View>
               <TouchableOpacity
                 style={[styles.trackButton, { backgroundColor: colors.accent }]}
@@ -312,6 +335,15 @@ export default function OrderDetailScreen() {
                 <Text style={styles.trackButtonText}>Track</Text>
               </TouchableOpacity>
             </View>
+            {!isBuyer && order.label_url && (
+              <TouchableOpacity
+                style={[styles.labelButton, { borderColor: colors.border }]}
+                onPress={handleViewLabel}
+              >
+                <Ionicons name="document-outline" size={18} color={colors.text} />
+                <Text style={[styles.labelButtonText, { color: colors.text }]}>View Label (PDF)</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -449,15 +481,24 @@ export default function OrderDetailScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Seller: Mark Shipped */}
+        {/* Seller: Create Shipping Label */}
         {!isBuyer && status === 'curator_confirmed' && !showTrackingInput && (
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: colors.accent }]}
-            onPress={() => setShowTrackingInput(true)}
-          >
-            <Ionicons name="paper-plane-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Add Tracking & Ship</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: colors.accent }]}
+              onPress={() => router.push(`/shipping/${id}`)}
+            >
+              <Ionicons name="document-text-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.actionButtonText}>Create Label</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.secondaryButton, { borderColor: colors.border }]}
+              onPress={() => setShowTrackingInput(true)}
+            >
+              <Ionicons name="create-outline" size={20} color={colors.text} />
+              <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Manual</Text>
+            </TouchableOpacity>
+          </>
         )}
 
         {/* Track Package */}
@@ -647,6 +688,13 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.xs,
     marginTop: 2,
   },
+  shippingInfo: {
+    marginBottom: SPACING.sm,
+  },
+  carrierText: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: '500',
+  },
   trackingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -669,6 +717,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
     fontSize: FONTS.sizes.sm,
+  },
+  labelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    marginTop: SPACING.md,
+  },
+  labelButtonText: {
+    fontWeight: '500',
+    fontSize: FONTS.sizes.sm,
+    marginLeft: SPACING.xs,
   },
   partyRow: {
     flexDirection: 'row',

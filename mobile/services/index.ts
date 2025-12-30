@@ -10,3 +10,4 @@ export { transactionsService } from './transactions';
 export { auctionService } from './auctionService';
 export { messagesService } from './messages';
 export { purseService } from './purse';
+export { shippingService } from './shipping';

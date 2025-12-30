@@ -55,6 +55,11 @@ export default function ProfileScreen() {
   const [loadingStripe, setLoadingStripe] = useState(false);
   const [startingOnboarding, setStartingOnboarding] = useState(false);
 
+  // Feedback state
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+
   const isCurator = user?.role === 'curator' || user?.curator?.approved;
 
   // Load invitation info on mount
@@ -107,22 +112,56 @@ export default function ProfileScreen() {
       }
 
       if (result.onboardingUrl) {
-        // Open Stripe onboarding in browser
-        const browserResult = await WebBrowser.openBrowserAsync(result.onboardingUrl);
+        // Open Stripe onboarding in auth session (handles custom scheme redirects)
+        const redirectUrl = 'nafisascloset://stripe-return';
+        const browserResult = await WebBrowser.openAuthSessionAsync(
+          result.onboardingUrl,
+          redirectUrl
+        );
 
         // After returning from browser, refresh status
         await loadStripeStatus();
         await refreshUser?.();
         setShowStripeModal(false);
 
-        if (stripeStatus?.onboardingComplete) {
-          Alert.alert('Success', 'Payment setup complete! You can now receive payouts.');
+        if (browserResult.type === 'success') {
+          // Check if onboarding completed
+          const status = await stripeService.getStatus();
+          if (status?.onboardingComplete) {
+            Alert.alert('Success', 'Payment setup complete! You can now receive payouts.');
+          } else {
+            Alert.alert('Incomplete', 'Please complete all required steps to receive payouts.');
+          }
         }
       }
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Failed to start payment setup');
     } finally {
       setStartingOnboarding(false);
+    }
+  };
+
+  const submitFeedback = async () => {
+    if (!feedbackMessage.trim()) {
+      Alert.alert('Error', 'Please enter your feedback');
+      return;
+    }
+
+    try {
+      setSubmittingFeedback(true);
+      const response = await api.post('/feedback', { message: feedbackMessage.trim() });
+
+      if (response.success) {
+        Alert.alert('Thank You!', 'Your feedback has been submitted.');
+        setFeedbackMessage('');
+        setShowFeedbackModal(false);
+      } else {
+        throw new Error(response.error || 'Failed to submit feedback');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to submit feedback');
+    } finally {
+      setSubmittingFeedback(false);
     }
   };
 
@@ -210,7 +249,7 @@ export default function ProfileScreen() {
     try {
       const urls = await uploadService.uploadImages([uri]);
       if (urls.length > 0) {
-        await api.put('/user/profile', { profilePhoto: urls[0] });
+        await api.put('/user', { profilePhoto: urls[0] });
         await refreshUser?.();
         Alert.alert('Success', 'Profile photo updated!');
       }
@@ -309,6 +348,7 @@ export default function ProfileScreen() {
 
   const menuItems = [
     { icon: 'person-outline', label: 'Edit Profile', onPress: () => showComingSoon('Edit Profile') },
+    { icon: 'sparkles', label: 'My Purse', onPress: () => router.push('/purse') },
     { icon: 'bag-outline', label: 'Orders', onPress: () => router.push('/orders') },
     ...(isCurator ? [{
       icon: 'wallet-outline',
@@ -317,7 +357,7 @@ export default function ProfileScreen() {
       highlight: !stripeStatus?.onboardingComplete,
     }] : []),
     { icon: 'card-outline', label: 'Payment Methods', onPress: () => router.push('/add-payment-method') },
-    { icon: 'location-outline', label: 'Shipping Addresses', onPress: () => showComingSoon('Shipping Addresses') },
+    { icon: 'location-outline', label: 'Shipping Addresses', onPress: () => router.push('/addresses') },
     { icon: 'notifications-outline', label: 'Notifications', onPress: () => showComingSoon('Notifications') },
     { icon: 'help-circle-outline', label: 'Help & Support', onPress: () => showComingSoon('Help & Support') },
     { icon: 'shield-outline', label: 'Privacy Policy', onPress: () => showComingSoon('Privacy Policy') },
@@ -327,6 +367,12 @@ export default function ProfileScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Profile</Text>
+        <TouchableOpacity
+          style={[styles.feedbackButton, { backgroundColor: colors.surface }]}
+          onPress={() => setShowFeedbackModal(true)}
+        >
+          <Text style={[styles.feedbackButtonText, { color: colors.textSecondary }]}>Feedback</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.profileSection}>
@@ -665,6 +711,67 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Feedback Modal */}
+      <Modal
+        visible={showFeedbackModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowFeedbackModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={[styles.modalContent, styles.glassCard, { backgroundColor: 'rgba(45, 27, 78, 0.95)' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Send Feedback
+              </Text>
+              <TouchableOpacity onPress={() => setShowFeedbackModal(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
+              Help us improve! Share your thoughts, report bugs, or suggest features.
+            </Text>
+
+            <TextInput
+              style={[styles.feedbackInput, {
+                color: colors.text,
+                backgroundColor: colors.surface,
+                borderColor: colors.border
+              }]}
+              placeholder="Type your feedback here..."
+              placeholderTextColor={colors.textMuted}
+              value={feedbackMessage}
+              onChangeText={setFeedbackMessage}
+              multiline
+              numberOfLines={6}
+              textAlignVertical="top"
+              maxLength={2000}
+            />
+
+            <Text style={[styles.charCount, { color: colors.textMuted }]}>
+              {feedbackMessage.length}/2000
+            </Text>
+
+            <TouchableOpacity
+              style={[styles.submitButton, { backgroundColor: colors.accent }]}
+              onPress={submitFeedback}
+              disabled={submittingFeedback || !feedbackMessage.trim()}
+            >
+              {submittingFeedback ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.submitButtonText}>Submit Feedback</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -677,10 +784,22 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   title: {
     fontSize: FONTS.sizes.xxxl,
     fontWeight: 'bold',
+  },
+  feedbackButton: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  feedbackButtonText: {
+    fontSize: FONTS.sizes.sm,
+    fontWeight: '500',
   },
   profileSection: {
     alignItems: 'center',
@@ -946,5 +1065,29 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.sm,
     textAlign: 'center',
     marginTop: SPACING.md,
+  },
+  feedbackInput: {
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    fontSize: FONTS.sizes.md,
+    minHeight: 150,
+    marginTop: SPACING.md,
+  },
+  charCount: {
+    fontSize: FONTS.sizes.xs,
+    textAlign: 'right',
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.md,
+  },
+  submitButton: {
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    color: '#FFFFFF',
+    fontSize: FONTS.sizes.md,
+    fontWeight: '600',
   },
 });

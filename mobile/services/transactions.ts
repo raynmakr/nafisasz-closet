@@ -14,7 +14,11 @@ export interface Transaction {
   stripe_transfer_id: string | null;
   receipt_url: string | null;
   tracking_number: string | null;
+  tracking_url: string | null;
   shipping_label: string | null;
+  label_url: string | null;
+  shipping_carrier: string | null;
+  shipping_service: string | null;
   shipped_at: string | null;
   delivered_at: string | null;
   payout_completed_at: string | null;
