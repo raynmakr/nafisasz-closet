@@ -1,4 +1,10 @@
 {
+  "rewrites": [
+    {
+      "source": "/api/shipping/:path*",
+      "destination": "/api/shipping"
+    }
+  ],
   "crons": [
     {
       "path": "/api/cron/check-auctions",

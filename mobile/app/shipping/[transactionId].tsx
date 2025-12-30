@@ -60,7 +60,26 @@ export default function ShippingScreen() {
       setRates(result.rates);
       setStep('rates');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to get shipping rates');
+      const msg = error.message || 'Failed to get shipping rates';
+
+      // Check for address-related errors and provide helpful navigation
+      if (msg.includes('address') || msg.includes('Address')) {
+        Alert.alert(
+          'Shipping Address Required',
+          msg.includes('Curator')
+            ? 'Please add your shipping address first.'
+            : 'The buyer has not added a shipping address yet. Please wait for them to add one.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            ...(msg.includes('Curator') ? [{
+              text: 'Add Address',
+              onPress: () => router.push('/addresses'),
+            }] : []),
+          ]
+        );
+      } else {
+        Alert.alert('Error', msg);
+      }
     } finally {
       setLoading(false);
     }

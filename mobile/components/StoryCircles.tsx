@@ -16,6 +16,7 @@ interface StoryCirclesProps {
   curators: StoryCurator[];
   onStoryPress: (curatorIndex: number) => void;
   onAddPress?: () => void;
+  showAddButton?: boolean; // Explicitly control add button visibility
 }
 
 const COLORS = {
@@ -27,10 +28,15 @@ const COLORS = {
   gradient: ['#9B59B6', '#E91E63'],
 };
 
-export function StoryCircles({ curators, onStoryPress, onAddPress }: StoryCirclesProps) {
+export function StoryCircles({ curators, onStoryPress, onAddPress, showAddButton }: StoryCirclesProps) {
   const router = useRouter();
   const { user } = useAuthStore();
-  const isCurator = user?.role === 'curator';
+  // Check multiple ways a user could be a curator
+  const isCurator = showAddButton ?? (
+    user?.role === 'curator' ||
+    user?.curator?.approved === true ||
+    (user as any)?.curator?.approved === true
+  );
 
   if (curators.length === 0 && !isCurator) {
     return null;

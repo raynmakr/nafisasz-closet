@@ -18,6 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nafisascloset.app",
+      "buildNumber": "6",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to record hunt stories and take product photos.",
@@ -53,6 +54,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-updates",
       "expo-apple-authentication",
       [
         "expo-notifications",
@@ -95,7 +97,9 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/cdd3a4b9-c0dc-4701-a119-933d1cf82d76"
+      "url": "https://u.expo.dev/cdd3a4b9-c0dc-4701-a119-933d1cf82d76",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
     }
   }
 }

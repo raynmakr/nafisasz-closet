@@ -138,15 +138,21 @@ export default function ChatScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
-          {data?.listing?.photo && (
-            <Image source={{ uri: data.listing.photo }} style={styles.listingThumb} />
+          {data?.otherUser?.profilePhoto ? (
+            <Image source={{ uri: data.otherUser.profilePhoto }} style={styles.recipientAvatar} />
+          ) : (
+            <View style={[styles.recipientAvatarPlaceholder, { backgroundColor: colors.accent }]}>
+              <Text style={styles.recipientAvatarText}>
+                {(data?.otherUser?.handle || data?.otherUser?.name)?.charAt(0).toUpperCase() || '?'}
+              </Text>
+            </View>
           )}
           <View style={styles.headerText}>
             <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-              {data?.otherUser?.name || 'Chat'}
+              @{data?.otherUser?.handle || 'user'}
             </Text>
             <Text style={[styles.headerSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
-              {data?.listing?.title}
+              Re: {data?.listing?.title}
             </Text>
           </View>
         </View>
@@ -236,10 +242,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SPACING.sm,
   },
-  listingThumb: {
-    width: 40,
-    height: 40,
-    borderRadius: BORDER_RADIUS.sm,
+  recipientAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  recipientAvatarPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recipientAvatarText: {
+    fontSize: FONTS.sizes.lg,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   headerText: {
     flex: 1,

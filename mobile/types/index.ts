@@ -61,6 +61,7 @@ export interface ListingCurator {
   id: string;
   userId: string;
   name: string;
+  handle: string | null;
   profilePhoto: string | null;
   rating: number;
   totalSales: number;

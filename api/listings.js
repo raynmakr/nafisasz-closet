@@ -224,6 +224,8 @@ function formatListing(l) {
       id: l.curator_id,
       userId: l.curator_user_id,
       name: l.curator_name || 'Unknown',
+      handle: l.curator_handle,
+      profilePhoto: l.curator_profile_photo || l.curator_avatar,
       avatarUrl: l.curator_avatar,
       rating: parseFloat(l.curator_rating) || 0,
       totalSales: l.curator_sales || 0

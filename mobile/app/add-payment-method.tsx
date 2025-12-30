@@ -185,7 +185,7 @@ function AddPaymentMethodContent() {
               Secure Payment
             </Text>
             <Text style={[styles.infoText, { color: colors.textMuted }]}>
-              Your card will only be charged if you win an auction. Card details are securely stored by Stripe.
+              Your card will only be charged if you win a claim. Card details are securely stored by Stripe.
             </Text>
           </View>
         </View>

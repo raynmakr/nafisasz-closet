@@ -86,6 +86,12 @@ export default function AddressFormScreen() {
       return;
     }
 
+    // Phone and email are required for shipping label creation
+    if (!phone.trim() || !email.trim()) {
+      Alert.alert('Error', 'Phone and email are required for shipping labels');
+      return;
+    }
+
     setSaving(true);
     try {
       const addressData = {
@@ -273,7 +279,9 @@ export default function AddressFormScreen() {
 
         {/* Phone */}
         <View style={styles.field}>
-          <Text style={[styles.label, { color: colors.text }]}>Phone (optional)</Text>
+          <Text style={[styles.label, { color: colors.text }]}>
+            Phone <Text style={{ color: colors.error }}>*</Text>
+          </Text>
           <TextInput
             style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
             value={phone}
@@ -286,7 +294,9 @@ export default function AddressFormScreen() {
 
         {/* Email */}
         <View style={styles.field}>
-          <Text style={[styles.label, { color: colors.text }]}>Email (optional)</Text>
+          <Text style={[styles.label, { color: colors.text }]}>
+            Email <Text style={{ color: colors.error }}>*</Text>
+          </Text>
           <TextInput
             style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
             value={email}

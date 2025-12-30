@@ -6,7 +6,8 @@
 - **Version:** 1.0 MVP
 - **Type:** Mobile marketplace app (iOS + Android)
 - **Stage:** Phase 3 - App Store Preparation
-- **Last Updated:** 2025-12-28 (EAS builds, GitHub repo)
+- **Last Updated:** 2025-12-29 (TestFlight build, Stripe Connect fix, privacy updates)
+- **API URL:** https://nafisasz-closet.vercel.app (cloud-deployed)
 - **GitHub:** https://github.com/raynmakr/nafisasz-closet
 
 ## CURRENT STATUS
@@ -130,6 +131,7 @@
 
 ### Immediate Priority
 1. **Stripe Integration Completion**
+   - [x] Stripe Connect onboarding URL fix (now uses web redirects)
    - [ ] Test full payment flow end-to-end on physical device
    - [ ] Verify pre-authorization capture on auction end
    - [ ] Test Stripe Connect curator payouts
@@ -143,18 +145,14 @@
    - [ ] Integrate tracking number updates
    - [ ] Shipping notifications to buyer
 
-3. **API Server Migration (Cloud)**
-   - [ ] Choose cloud provider (Railway, Render, AWS, or DigitalOcean)
-   - [ ] Set up PostgreSQL database (managed)
-   - [ ] Set up Redis for caching/sessions
-   - [ ] Configure environment variables
-   - [ ] Set up CI/CD pipeline
-   - [ ] Migrate from Vercel serverless to persistent server
-   - [ ] Update mobile app API_URL
+3. **API Server**
+   - [x] API deployed to Vercel (serverless) - accessible from anywhere
+   - [x] Mobile app configured to use cloud API
+   - [ ] (Optional) Migrate to persistent server for WebSockets if needed
 
 ### App Store Submission
 4. **TestFlight / App Store**
-   - [ ] Build with `preview` profile for TestFlight
+   - [x] Build with `preview` profile for TestFlight (in progress)
    - [ ] Submit to App Store Connect
    - [ ] Beta testing with internal testers
    - [ ] App Store screenshots and metadata
@@ -162,7 +160,7 @@
    - [ ] Production release
 
 ### Future
-5. **VIP Buyer Subscription** - Early access to listings ($19/mo)
+5. **VIP Buyer Subscription** - Early access to listings ($19/mo) - DEFERRED
 
 ## EAS BUILD COMMANDS
 
@@ -317,6 +315,13 @@ Email notifications use Resend. Key files:
 - "Bid" → Use "Claim" instead
 - "Bidding" → Use "Claiming" instead
 - "Bidder" → Use "Claimer" instead
+
+**PRIVACY: Never expose user names in the app UI:**
+- Always display @handle instead of user's real name
+- Profile photos with @handle only - no names visible
+- Curators identified by @handle on listings, chat, search results
+- Letter avatars should use first letter of handle (not name)
+- Exception: User's own profile settings page may show their name for editing
 
 **Color Scheme:**
 - Background: Deep purple (#1A0A2E)

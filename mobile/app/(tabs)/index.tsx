@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Animated,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { listingsService } from '@/services';
 import { storiesService, StoryCurator } from '@/services/stories';
@@ -112,9 +112,26 @@ function ListingCard({ listing }: { listing: Listing }) {
       </TouchableOpacity>
       <View style={styles.cardContent}>
         <View style={styles.cardHeader}>
-          <Text style={[styles.cardBrand, { color: colors.textSecondary }]}>
-            {listing.brand || 'Unknown Brand'}
-          </Text>
+          <TouchableOpacity
+            style={styles.curatorRow}
+            onPress={() => listing.curator?.userId && router.push(`/curator/${listing.curator.userId}`)}
+          >
+            {listing.curator?.profilePhoto ? (
+              <Image
+                source={{ uri: listing.curator.profilePhoto }}
+                style={styles.curatorAvatar}
+              />
+            ) : (
+              <View style={[styles.curatorAvatarPlaceholder, { backgroundColor: colors.accent }]}>
+                <Text style={styles.curatorAvatarText}>
+                  {listing.curator?.name?.charAt(0).toUpperCase() || 'C'}
+                </Text>
+              </View>
+            )}
+            <Text style={[styles.cardBrand, { color: colors.textSecondary }]}>
+              @{listing.curator?.handle || listing.curator?.name?.toLowerCase().replace(/\s+/g, '') || 'curator'}
+            </Text>
+          </TouchableOpacity>
           <View style={styles.timerContainer}>
             <Text style={[styles.timerLabel, { color: colors.textMuted }]}>
               Time to Buy
@@ -154,8 +171,14 @@ export default function DiscoverScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [storyViewerVisible, setStoryViewerVisible] = useState(false);
   const [selectedCuratorIndex, setSelectedCuratorIndex] = useState(0);
-  const { user } = useAuth();
-  const isCurator = user?.curator?.approved === true;
+  const { user, refreshUser } = useAuth();
+  // Check both curator.approved and role for backwards compatibility
+  const isCurator = user?.curator?.approved === true || user?.role === 'curator';
+
+  // Refresh user data on mount to get latest curator status
+  useEffect(() => {
+    refreshUser?.();
+  }, []);
 
   const {
     data: listings,
@@ -179,6 +202,14 @@ export default function DiscoverScreen() {
     await Promise.all([refetch(), refetchStories()]);
     setRefreshing(false);
   }, [refetch, refetchStories]);
+
+  // Refresh feed when tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+      refetchStories();
+    }, [refetch, refetchStories])
+  );
 
   const handleStoryPress = (curatorIndex: number) => {
     setSelectedCuratorIndex(curatorIndex);
@@ -213,17 +244,12 @@ export default function DiscoverScreen() {
         renderItem={({ item }) => <ListingCard listing={item} />}
         contentContainerStyle={styles.list}
         ListHeaderComponent={
-          storyCurators && storyCurators.length > 0 ? (
+          (storyCurators && storyCurators.length > 0) || isCurator ? (
             <StoryCircles
-              curators={storyCurators}
+              curators={storyCurators || []}
               onStoryPress={handleStoryPress}
               onAddPress={() => router.push('/story/create')}
-            />
-          ) : isCurator ? (
-            <StoryCircles
-              curators={[]}
-              onStoryPress={() => {}}
-              onAddPress={() => router.push('/story/create')}
+              showAddButton={isCurator}
             />
           ) : null
         }
@@ -356,10 +382,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.xs,
   },
+  curatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  curatorAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
+  curatorAvatarPlaceholder: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  curatorAvatarText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
   cardBrand: {
     fontSize: FONTS.sizes.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    textTransform: 'lowercase',
+    letterSpacing: 0.5,
   },
   timerContainer: {
     alignItems: 'flex-end',

@@ -155,9 +155,9 @@ async function handleCreateAccount(req, res, decoded) {
     [account.id, curator.id]
   );
 
-  // Create onboarding link
-  const returnUrl = `${APP_SCHEME}://stripe-return?status=success`;
-  const refreshUrl = `${APP_URL}/api/stripe/connect?refresh=true`;
+  // Create onboarding link - use web URLs that redirect to app
+  const returnUrl = `${APP_URL}/api/stripe/connect?action=complete`;
+  const refreshUrl = `${APP_URL}/api/stripe/connect?action=reauth`;
 
   const accountLink = await createAccountLink(account.id, returnUrl, refreshUrl);
 
@@ -196,9 +196,9 @@ async function handleCreateLink(req, res, decoded) {
     });
   }
 
-  // Create new onboarding link
-  const returnUrl = `${APP_SCHEME}://stripe-return?status=success`;
-  const refreshUrl = `${APP_URL}/api/stripe/connect?refresh=true`;
+  // Create new onboarding link - use web URLs that redirect to app
+  const returnUrl = `${APP_URL}/api/stripe/connect?action=complete`;
+  const refreshUrl = `${APP_URL}/api/stripe/connect?action=reauth`;
 
   const accountLink = await createAccountLink(curator.stripe_account_id, returnUrl, refreshUrl);
 
@@ -243,9 +243,9 @@ async function handleReauth(req, res, token) {
       return res.redirect(302, redirectUrl);
     }
 
-    // Generate new onboarding link
-    const returnUrl = `${APP_SCHEME}://stripe-return?status=success`;
-    const refreshUrl = `${APP_URL}/api/stripe/connect?refresh=true&token=${token}`;
+    // Generate new onboarding link - use web URLs that redirect to app
+    const returnUrl = `${APP_URL}/api/stripe/connect?action=complete`;
+    const refreshUrl = `${APP_URL}/api/stripe/connect?action=reauth`;
 
     const accountLink = await createAccountLink(curator.stripe_account_id, returnUrl, refreshUrl);
 

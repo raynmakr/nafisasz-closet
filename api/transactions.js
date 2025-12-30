@@ -77,10 +77,10 @@ async function handleListTransactions(req, res, decoded, role, status) {
   const params = [decoded.userId];
 
   if (role === 'seller') {
-    // Curator's sold items
+    // Curator's sold items - show buyer info
     sql = `
       SELECT t.*, l.title, l.photos, l.brand, l.size,
-             u.name as buyer_name, u.email as buyer_email
+             u.handle as buyer_handle, u.name as buyer_name, u.email as buyer_email
       FROM transactions t
       JOIN listings l ON t.listing_id = l.id
       JOIN users u ON t.buyer_id = u.id
@@ -88,10 +88,10 @@ async function handleListTransactions(req, res, decoded, role, status) {
       WHERE c.user_id = $1
     `;
   } else {
-    // Buyer's purchases
+    // Buyer's purchases - show curator info (join users via curators to get handle)
     sql = `
       SELECT t.*, l.title, l.photos, l.brand, l.size,
-             cu.name as curator_name
+             cu.handle as curator_handle, cu.name as curator_name
       FROM transactions t
       JOIN listings l ON t.listing_id = l.id
       JOIN curators c ON t.curator_id = c.id

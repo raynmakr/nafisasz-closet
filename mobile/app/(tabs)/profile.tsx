@@ -350,12 +350,19 @@ export default function ProfileScreen() {
     { icon: 'person-outline', label: 'Edit Profile', onPress: () => showComingSoon('Edit Profile') },
     { icon: 'sparkles', label: 'My Purse', onPress: () => router.push('/purse') },
     { icon: 'bag-outline', label: 'Orders', onPress: () => router.push('/orders') },
-    ...(isCurator ? [{
-      icon: 'wallet-outline',
-      label: stripeStatus?.onboardingComplete ? 'Payment Setup ✓' : 'Payment Setup',
-      onPress: handleStripeSetup,
-      highlight: !stripeStatus?.onboardingComplete,
-    }] : []),
+    ...(isCurator ? [
+      {
+        icon: 'cube-outline',
+        label: 'Shipping',
+        onPress: () => router.push('/shipping-dashboard'),
+      },
+      {
+        icon: 'wallet-outline',
+        label: stripeStatus?.onboardingComplete ? 'Payment Setup ✓' : 'Payment Setup',
+        onPress: handleStripeSetup,
+        highlight: !stripeStatus?.onboardingComplete,
+      },
+    ] : []),
     { icon: 'card-outline', label: 'Payment Methods', onPress: () => router.push('/add-payment-method') },
     { icon: 'location-outline', label: 'Shipping Addresses', onPress: () => router.push('/addresses') },
     { icon: 'notifications-outline', label: 'Notifications', onPress: () => showComingSoon('Notifications') },
@@ -366,7 +373,14 @@ export default function ProfileScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Profile</Text>
+        <View style={styles.headerLeft}>
+          <Text style={[styles.title, { color: colors.text }]}>Profile</Text>
+          {isCurator && (
+            <View style={[styles.curatorBadge, { backgroundColor: colors.accent }]}>
+              <Text style={[styles.curatorBadgeText, { color: '#FFFFFF' }]}>Curator</Text>
+            </View>
+          )}
+        </View>
         <TouchableOpacity
           style={[styles.feedbackButton, { backgroundColor: colors.surface }]}
           onPress={() => setShowFeedbackModal(true)}
@@ -375,67 +389,65 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.profileSection}>
-        <TouchableOpacity onPress={handlePhotoPress} disabled={uploadingPhoto}>
-          <View style={styles.avatarContainer}>
-            {user?.avatarUrl || user?.profilePhoto ? (
-              <Image source={{ uri: user.avatarUrl || user.profilePhoto }} style={styles.avatarImage} />
-            ) : (
-              <View style={[styles.avatar, { backgroundColor: colors.accent }]}>
-                <Text style={[styles.avatarText, { color: colors.background }]}>
-                  {user?.name?.charAt(0).toUpperCase() || 'U'}
-                </Text>
+      <ScrollView
+        style={styles.scrollContent}
+        contentContainerStyle={styles.scrollContentContainer}
+        showsVerticalScrollIndicator={true}
+        bounces={true}
+      >
+        <View style={styles.profileSection}>
+          <TouchableOpacity onPress={handlePhotoPress} disabled={uploadingPhoto}>
+            <View style={styles.avatarContainer}>
+              {user?.avatarUrl || user?.profilePhoto ? (
+                <Image source={{ uri: user.avatarUrl || user.profilePhoto }} style={styles.avatarImage} />
+              ) : (
+                <View style={[styles.avatar, { backgroundColor: colors.accent }]}>
+                  <Text style={[styles.avatarText, { color: colors.background }]}>
+                    {user?.name?.charAt(0).toUpperCase() || 'U'}
+                  </Text>
+                </View>
+              )}
+              <View style={[styles.cameraOverlay, { backgroundColor: colors.surface }]}>
+                {uploadingPhoto ? (
+                  <ActivityIndicator size="small" color={colors.accent} />
+                ) : (
+                  <Ionicons name="camera" size={16} color={colors.text} />
+                )}
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          {/* Handle as primary identifier */}
+          <TouchableOpacity style={styles.handleRow} onPress={openHandleModal}>
+            <Text style={[styles.userHandle, { color: colors.text }]}>
+              @{user?.handle || 'username'}
+            </Text>
+            <Ionicons name="pencil" size={16} color={colors.textMuted} style={styles.editIcon} />
+          </TouchableOpacity>
+
+          {/* Name as secondary */}
+          <Text style={[styles.userName, { color: colors.textSecondary }]}>
+            {user?.name || 'User'}
+          </Text>
+
+          {/* Invite Friends Button */}
+          <TouchableOpacity
+            style={[styles.inviteButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => setShowInviteModal(true)}
+          >
+            <Ionicons name="person-add-outline" size={18} color={colors.accent} />
+            <Text style={[styles.inviteButtonText, { color: colors.text }]}>
+              Invite Friends
+            </Text>
+            {invitationInfo && invitationInfo.referralCount > 0 && (
+              <View style={[styles.referralBadge, { backgroundColor: colors.accent }]}>
+                <Text style={styles.referralBadgeText}>{invitationInfo.referralCount}</Text>
               </View>
             )}
-            <View style={[styles.cameraOverlay, { backgroundColor: colors.surface }]}>
-              {uploadingPhoto ? (
-                <ActivityIndicator size="small" color={colors.accent} />
-              ) : (
-                <Ionicons name="camera" size={16} color={colors.text} />
-              )}
-            </View>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
 
-        {/* Handle as primary identifier */}
-        <TouchableOpacity style={styles.handleRow} onPress={openHandleModal}>
-          <Text style={[styles.userHandle, { color: colors.text }]}>
-            @{user?.handle || 'username'}
-          </Text>
-          <Ionicons name="pencil" size={16} color={colors.textMuted} style={styles.editIcon} />
-        </TouchableOpacity>
-
-        {/* Name as secondary */}
-        <Text style={[styles.userName, { color: colors.textSecondary }]}>
-          {user?.name || 'User'}
-        </Text>
-
-        {isCurator && (
-          <View style={[styles.badge, { backgroundColor: colors.accent }]}>
-            <Text style={[styles.badgeText, { color: colors.background }]}>
-              Curator
-            </Text>
-          </View>
-        )}
-
-        {/* Invite Friends Button */}
-        <TouchableOpacity
-          style={[styles.inviteButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          onPress={() => setShowInviteModal(true)}
-        >
-          <Ionicons name="person-add-outline" size={18} color={colors.accent} />
-          <Text style={[styles.inviteButtonText, { color: colors.text }]}>
-            Invite Friends
-          </Text>
-          {invitationInfo && invitationInfo.referralCount > 0 && (
-            <View style={[styles.referralBadge, { backgroundColor: colors.accent }]}>
-              <Text style={styles.referralBadgeText}>{invitationInfo.referralCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.menu}>
+        <View style={styles.menu}>
         {menuItems.map((item, index) => (
           <TouchableOpacity
             key={index}
@@ -473,6 +485,7 @@ export default function ProfileScreen() {
       >
         <Text style={[styles.logoutText, { color: '#FFFFFF' }]}>Sign Out</Text>
       </TouchableOpacity>
+      </ScrollView>
 
       {/* Curator Application Modal */}
       <Modal
@@ -780,17 +793,37 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  scrollContent: {
+    flex: 1,
+  },
+  scrollContentContainer: {
+    paddingBottom: 100,
+  },
   header: {
     paddingTop: 60,
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+  },
+  headerLeft: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
   },
   title: {
     fontSize: FONTS.sizes.xxxl,
     fontWeight: 'bold',
+  },
+  curatorBadge: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.sm,
+    marginTop: SPACING.xs,
+  },
+  curatorBadgeText: {
+    fontSize: FONTS.sizes.xs,
+    fontWeight: '600',
   },
   feedbackButton: {
     paddingHorizontal: SPACING.md,

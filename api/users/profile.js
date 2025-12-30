@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     }
 
     const result = await query(`
-      SELECT id, name, handle, avatar_url, bio
+      SELECT id, name, handle, avatar_url, profile_photo, bio
       FROM users
       WHERE id = $1
     `, [userId]);
@@ -51,7 +51,17 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    return res.json({ user: result.rows[0] });
+    const u = result.rows[0];
+    return res.json({
+      user: {
+        id: u.id,
+        name: u.name,
+        handle: u.handle,
+        avatarUrl: u.avatar_url,
+        profilePhoto: u.profile_photo || u.avatar_url,
+        bio: u.bio,
+      }
+    });
   } catch (error) {
     console.error('User profile error:', error);
     return res.status(500).json({ error: error.message });

@@ -30,10 +30,22 @@
       "distribution": "store",
       "ios": {
         "simulator": false
-      }
+      },
+      "channel": "production"
     }
   },
   "submit": {
-    "production": {}
+    "preview": {
+      "ios": {
+        "appleId": "nafisasz@gmail.com",
+        "ascAppId": "6740546402"
+      }
+    },
+    "production": {
+      "ios": {
+        "appleId": "nafisasz@gmail.com",
+        "ascAppId": "6740546402"
+      }
+    }
   }
 }

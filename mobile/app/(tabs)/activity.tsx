@@ -234,16 +234,22 @@ export default function ActivityScreen() {
       style={[styles.itemCard, { backgroundColor: colors.surface }]}
       onPress={() => router.push(`/curator/${item.id}`)}
     >
-      <View style={[styles.curatorAvatar, { backgroundColor: colors.accent }]}>
-        <Text style={[styles.curatorInitial, { color: colors.background }]}>
-          {item.name.charAt(0).toUpperCase()}
-        </Text>
-      </View>
+      {item.profilePhoto ? (
+        <Image source={{ uri: item.profilePhoto }} style={styles.curatorAvatarImage} />
+      ) : (
+        <View style={[styles.curatorAvatar, { backgroundColor: colors.accent }]}>
+          <Text style={[styles.curatorInitial, { color: colors.background }]}>
+            {item.name.charAt(0).toUpperCase()}
+          </Text>
+        </View>
+      )}
       <View style={styles.itemInfo}>
-        <Text style={[styles.itemTitle, { color: colors.text }]}>{item.name}</Text>
+        <Text style={[styles.itemTitle, { color: colors.text }]}>
+          {item.handle ? `@${item.handle}` : item.name}
+        </Text>
         {item.handle && (
           <Text style={[styles.itemPrice, { color: colors.textSecondary }]}>
-            @{item.handle}
+            {item.name}
           </Text>
         )}
       </View>
@@ -468,6 +474,11 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  curatorAvatarImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   curatorInitial: {
     fontSize: FONTS.sizes.xl,

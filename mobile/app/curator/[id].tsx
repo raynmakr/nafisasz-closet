@@ -129,13 +129,22 @@ export default function CuratorProfileScreen() {
         }
         ListHeaderComponent={
           <View style={styles.header}>
-            <View style={[styles.avatar, { backgroundColor: colors.accent }]}>
-              <Text style={[styles.avatarText, { color: colors.background }]}>
-                {curator.name.charAt(0).toUpperCase()}
-              </Text>
-            </View>
+            {curator.profilePhoto ? (
+              <Image
+                source={{ uri: curator.profilePhoto }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: colors.accent }]}>
+                <Text style={[styles.avatarText, { color: colors.background }]}>
+                  {curator.name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
 
-            <Text style={[styles.name, { color: colors.text }]}>{curator.name}</Text>
+            <Text style={[styles.handle, { color: colors.text }]}>
+              @{curator.handle || curator.name.toLowerCase().replace(/\s+/g, '')}
+            </Text>
 
             {curator.bio && (
               <Text style={[styles.bio, { color: colors.textSecondary }]}>
@@ -264,6 +273,16 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 40,
     fontWeight: 'bold',
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
+  handle: {
+    fontSize: FONTS.sizes.xxl,
+    fontWeight: 'bold',
+    marginTop: SPACING.md,
   },
   name: {
     fontSize: FONTS.sizes.xxl,

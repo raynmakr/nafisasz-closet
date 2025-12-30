@@ -164,21 +164,33 @@ async function handleGetMessages(res, userId, listingId) {
   if (listing.curator_user_id === userId) {
     // User is curator, get the buyer info
     const buyerResult = await query(`
-      SELECT DISTINCT u.id, u.name, u.avatar_url
+      SELECT DISTINCT u.id, u.name, u.handle, u.avatar_url, u.profile_photo
       FROM messages m
       JOIN users u ON m.sender_id = u.id
       WHERE m.listing_id = $1 AND m.sender_id != $2
       LIMIT 1
     `, [listingId, userId]);
-    otherUser = buyerResult.rows[0] || null;
+    const buyer = buyerResult.rows[0];
+    otherUser = buyer ? {
+      id: buyer.id,
+      name: buyer.name,
+      handle: buyer.handle,
+      profilePhoto: buyer.profile_photo || buyer.avatar_url,
+    } : null;
   } else {
     // User is buyer, get curator info
     const curatorResult = await query(`
-      SELECT u.id, u.name, u.avatar_url
+      SELECT u.id, u.name, u.handle, u.avatar_url, u.profile_photo
       FROM users u
       WHERE u.id = $1
     `, [listing.curator_user_id]);
-    otherUser = curatorResult.rows[0] || null;
+    const curator = curatorResult.rows[0];
+    otherUser = curator ? {
+      id: curator.id,
+      name: curator.name,
+      handle: curator.handle,
+      profilePhoto: curator.profile_photo || curator.avatar_url,
+    } : null;
   }
 
   return res.json({

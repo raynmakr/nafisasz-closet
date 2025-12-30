@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +23,8 @@ interface UserInfo {
   id: number;
   name: string;
   handle?: string;
-  avatar_url?: string;
+  avatarUrl?: string;
+  profilePhoto?: string;
 }
 
 export default function DMChatScreen() {
@@ -149,20 +151,19 @@ export default function DMChatScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
-          <View style={[styles.avatar, { backgroundColor: colors.accent }]}>
-            <Text style={styles.avatarText}>
-              {otherUser?.name?.charAt(0).toUpperCase() || '?'}
-            </Text>
-          </View>
+          {otherUser?.profilePhoto ? (
+            <Image source={{ uri: otherUser.profilePhoto }} style={styles.avatarImage} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: colors.accent }]}>
+              <Text style={styles.avatarText}>
+                {(otherUser?.handle || otherUser?.name)?.charAt(0).toUpperCase() || '?'}
+              </Text>
+            </View>
+          )}
           <View style={styles.headerText}>
             <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-              {otherUser?.name || 'User'}
+              @{otherUser?.handle || 'user'}
             </Text>
-            {otherUser?.handle && (
-              <Text style={[styles.headerSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
-                @{otherUser.handle}
-              </Text>
-            )}
           </View>
         </View>
       </View>
@@ -180,7 +181,7 @@ export default function DMChatScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              Start a conversation with {otherUser?.name || 'this user'}
+              Start a conversation with @{otherUser?.handle || 'user'}
             </Text>
           </View>
         }
@@ -252,11 +253,16 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   avatarText: {
     color: '#FFFFFF',

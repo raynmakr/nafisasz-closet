@@ -63,18 +63,29 @@ export default function OrderDetailScreen() {
   const [showTrackingInput, setShowTrackingInput] = useState(false);
   const [trackingNumber, setTrackingNumber] = useState('');
 
-  const isBuyer = order?.buyer_id === user?.id;
+  // Determine role from the transaction data itself:
+  // - If buyer_handle/buyer_name exists, we fetched as seller (seller sees buyer info)
+  // - If curator_handle/curator_name exists, we fetched as buyer (buyer sees curator info)
+  const isViewingAsSeller = !!((order as any)?.buyer_handle || (order as any)?.buyer_name);
+  const isViewingAsBuyer = !!((order as any)?.curator_handle || (order as any)?.curator_name);
+
+  // Fallback to ID comparison if the fields aren't available
+  const isBuyer = isViewingAsBuyer || (!isViewingAsSeller && order?.buyer_id?.toString() === user?.id?.toString());
   const isSeller = user?.role === 'curator' || user?.curator?.approved;
 
   const loadOrder = useCallback(async () => {
     try {
-      // Get all transactions and find the one we need
-      const buyerResult = await transactionsService.getTransactions('buyer');
-      let found = buyerResult.transactions.find((t) => t.id.toString() === id);
+      // Always fetch both buyer and seller transactions to find the order
+      const [buyerResult, sellerResult] = await Promise.all([
+        transactionsService.getTransactions('buyer'),
+        transactionsService.getTransactions('seller').catch(() => ({ transactions: [] })),
+      ]);
 
-      if (!found && isSeller) {
-        const sellerResult = await transactionsService.getTransactions('seller');
-        found = sellerResult.transactions.find((t) => t.id.toString() === id);
+      // Check SELLER transactions first (so curators see seller view by default)
+      // Then fall back to buyer transactions
+      let found = sellerResult.transactions.find((t) => t.id.toString() === id);
+      if (!found) {
+        found = buyerResult.transactions.find((t) => t.id.toString() === id);
       }
 
       setOrder(found || null);
@@ -84,7 +95,7 @@ export default function OrderDetailScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [id, isSeller]);
+  }, [id]);
 
   useEffect(() => {
     loadOrder();
@@ -355,16 +366,19 @@ export default function OrderDetailScreen() {
           <View style={styles.partyRow}>
             <View style={[styles.partyAvatar, { backgroundColor: colors.accent }]}>
               <Text style={styles.partyAvatarText}>
-                {(isBuyer ? order.curator_name : order.buyer_name)?.charAt(0).toUpperCase() || '?'}
+                {(isBuyer
+                  ? ((order as any).curator_handle || (order as any).curator_name)
+                  : ((order as any).buyer_handle || (order as any).buyer_name)
+                )?.charAt(0).toUpperCase() || '?'}
               </Text>
             </View>
             <View>
               <Text style={[styles.partyName, { color: colors.text }]}>
-                {isBuyer ? order.curator_name : order.buyer_name}
+                {isBuyer
+                  ? `@${(order as any).curator_handle || (order as any).curator_name}`
+                  : `@${(order as any).buyer_handle || (order as any).buyer_name}`
+                }
               </Text>
-              {!isBuyer && order.buyer_email && (
-                <Text style={[styles.partyEmail, { color: colors.textMuted }]}>{order.buyer_email}</Text>
-              )}
             </View>
           </View>
         </View>

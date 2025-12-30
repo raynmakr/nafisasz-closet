@@ -113,10 +113,10 @@ export default function ListingDetailScreen() {
               );
             }
           } else {
-            Alert.alert('Auction Ended', `Won by ${result.transaction.winnerName}`);
+            Alert.alert('Sold!', `Won by ${result.transaction.winnerName}`);
           }
         } else if (result.status === 'expired') {
-          Alert.alert('Auction Ended', 'This auction ended with no claims.');
+          Alert.alert('Expired', 'This post ended with no claims.');
         }
         setCompletionStatus('completed');
       }
@@ -130,14 +130,14 @@ export default function ListingDetailScreen() {
   // Handle curator early close
   const handleCuratorCloseEarly = async () => {
     Alert.alert(
-      'Close Auction Early',
+      'Close Post Early',
       listing?.currentHighBid
-        ? `Are you sure you want to end this auction? The current highest claim is $${listing.currentHighBid.toLocaleString()}.`
-        : 'Are you sure you want to end this auction with no claims? The item will be marked as expired.',
+        ? `Are you sure you want to end this post? The current highest claim is $${listing.currentHighBid.toLocaleString()}.`
+        : 'Are you sure you want to end this post with no claims? The item will be marked as expired.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Close Auction',
+          text: 'Close Post',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -148,13 +148,13 @@ export default function ListingDetailScreen() {
               queryClient.invalidateQueries({ queryKey: ['my-listings'] });
 
               if (result.status === 'sold') {
-                Alert.alert('Success', 'Auction closed! Winner will be notified to pay.');
+                Alert.alert('Success', 'Post closed! Winner will be notified to pay.');
               } else {
-                Alert.alert('Auction Closed', 'No claims were placed on this item.');
+                Alert.alert('Post Closed', 'No claims were placed on this item.');
               }
               setCompletionStatus('completed');
             } catch (error) {
-              Alert.alert('Error', 'Failed to close auction. Please try again.');
+              Alert.alert('Error', 'Failed to close post. Please try again.');
               setCompletionStatus('idle');
             }
           },
@@ -491,13 +491,23 @@ export default function ListingDetailScreen() {
                 style={[styles.curatorCard, { backgroundColor: colors.surface }]}
                 onPress={() => router.push(`/curator/${listing.curator!.id}`)}
               >
-                <View style={[styles.curatorAvatar, { backgroundColor: colors.accent }]}>
-                  <Text style={[styles.curatorInitial, { color: colors.background }]}>
-                    {listing.curator.name.charAt(0)}
-                  </Text>
-                </View>
+                {listing.curator.profilePhoto ? (
+                  <Image
+                    source={{ uri: listing.curator.profilePhoto }}
+                    style={styles.curatorAvatarImage}
+                  />
+                ) : (
+                  <View style={[styles.curatorAvatar, { backgroundColor: colors.accent }]}>
+                    <Text style={[styles.curatorInitial, { color: colors.background }]}>
+                      {listing.curator.name.charAt(0)}
+                    </Text>
+                  </View>
+                )}
                 <View style={styles.curatorInfo}>
                   <Text style={[styles.curatorName, { color: colors.text }]}>
+                    @{listing.curator.handle || listing.curator.name.toLowerCase().replace(/\s+/g, '')}
+                  </Text>
+                  <Text style={[styles.curatorStats, { color: colors.textSecondary }]}>
                     {listing.curator.name}
                   </Text>
                 </View>
@@ -547,7 +557,7 @@ export default function ListingDetailScreen() {
 
           {isOwnListing && (
             <View style={styles.section}>
-              {/* Close Auction Early button - only show for active auctions */}
+              {/* Close Post Early button - only show for active listings */}
               {listing.status === 'active' && !isExpired && (
                 <TouchableOpacity
                   style={[styles.closeEarlyButton, { borderColor: colors.warning }]}
@@ -556,7 +566,7 @@ export default function ListingDetailScreen() {
                 >
                   <Ionicons name="close-circle-outline" size={20} color={colors.warning} />
                   <Text style={[styles.closeEarlyButtonText, { color: colors.warning }]}>
-                    {completionStatus === 'completing' ? 'Closing...' : 'Close Auction Early'}
+                    {completionStatus === 'completing' ? 'Closing...' : 'Close Post Early'}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -710,6 +720,11 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  curatorAvatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   curatorInitial: {
     fontSize: FONTS.sizes.lg,
