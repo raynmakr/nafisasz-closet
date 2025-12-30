@@ -29,6 +29,13 @@ const DURATION_STOPS = [
   { label: '48 hours', value: 'FORTY_EIGHT_HOURS' as const, minutes: 2880 },
 ];
 
+const SIZE_OPTIONS = [
+  'XS', 'S', 'M', 'L', 'XL', 'XXL',
+  '0', '2', '4', '6', '8', '10', '12', '14', '16',
+  '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '36', '38', '40',
+  'One Size', 'OS',
+];
+
 type DurationValue = typeof DURATION_STOPS[number]['value'];
 
 export default function CreateScreen() {
@@ -37,6 +44,7 @@ export default function CreateScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [brand, setBrand] = useState('');
+  const [size, setSize] = useState('');
   const [price, setPrice] = useState('');
   const [durationIndex, setDurationIndex] = useState(2); // Default: 6 hours (index 2)
 
@@ -102,6 +110,7 @@ export default function CreateScreen() {
     setTitle('');
     setDescription('');
     setBrand('');
+    setSize('');
     setPrice('');
     setDurationIndex(2); // Reset to 6 hours
   };
@@ -147,6 +156,7 @@ export default function CreateScreen() {
         title: title.trim(),
         description: description.trim() || undefined,
         brand: brand.trim() || undefined,
+        size: size.trim() || undefined,
         photos: uploadedUrls,
         retailPrice: priceNum,
         auctionDuration: currentDuration.value,
@@ -273,6 +283,58 @@ export default function CreateScreen() {
               value={brand}
               onChangeText={setBrand}
               maxLength={50}
+            />
+          </View>
+
+          {/* Size Input */}
+          <View style={styles.inputSection}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>
+              Size
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.sizeScroll}
+              contentContainerStyle={styles.sizeScrollContent}
+            >
+              {SIZE_OPTIONS.map((sizeOption) => (
+                <TouchableOpacity
+                  key={sizeOption}
+                  style={[
+                    styles.sizeOption,
+                    {
+                      backgroundColor: size === sizeOption ? colors.accent : colors.surface,
+                      borderColor: size === sizeOption ? colors.accent : colors.border,
+                    },
+                  ]}
+                  onPress={() => setSize(size === sizeOption ? '' : sizeOption)}
+                >
+                  <Text
+                    style={[
+                      styles.sizeOptionText,
+                      { color: size === sizeOption ? '#FFFFFF' : colors.text },
+                    ]}
+                  >
+                    {sizeOption}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  backgroundColor: colors.surface,
+                  color: colors.text,
+                  borderColor: colors.border,
+                  marginTop: SPACING.sm,
+                },
+              ]}
+              placeholder="Or enter custom size"
+              placeholderTextColor={colors.textMuted}
+              value={size}
+              onChangeText={setSize}
+              maxLength={20}
             />
           </View>
 
@@ -574,6 +636,25 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     fontSize: FONTS.sizes.md,
     minHeight: 100,
+  },
+  sizeScroll: {
+    marginHorizontal: -SPACING.lg,
+  },
+  sizeScrollContent: {
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.xs,
+  },
+  sizeOption: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    minWidth: 44,
+    alignItems: 'center',
+  },
+  sizeOptionText: {
+    fontSize: FONTS.sizes.sm,
+    fontWeight: '600',
   },
   charCount: {
     fontSize: FONTS.sizes.sm,
