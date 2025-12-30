@@ -6,9 +6,10 @@
 - **Version:** 1.0 MVP
 - **Type:** Mobile marketplace app (iOS + Android)
 - **Stage:** Phase 3 - App Store Preparation
-- **Last Updated:** 2025-12-29 (TestFlight build, Stripe Connect fix, privacy updates)
+- **Last Updated:** 2025-12-30 (Shippo shipping integration, size field, EAS account migration)
 - **API URL:** https://nafisasz-closet.vercel.app (cloud-deployed)
 - **GitHub:** https://github.com/raynmakr/nafisasz-closet
+- **EAS Account:** raynmakr-inc (corporate account with paid plan)
 
 ## CURRENT STATUS
 
@@ -122,6 +123,21 @@
   - [x] API: `/api/user/invitation` - Get user's invite code
   - [x] API: `/api/invitation/validate` - Validate invite codes
   - [x] Mobile: Invite friends screen with shareable code/link
+- [x] Shipping Integration (Shippo) - In Test Mode
+  - [x] Shippo API integration (`lib/shippo.js`)
+  - [x] Address validation API
+  - [x] Shipping rates API (`/api/shipping/rates`)
+  - [x] Label purchase API (`/api/shipping/label`) - working in test mode
+  - [x] Tracking API (`/api/shipping/track`)
+  - [x] Mobile: Shipping address management (`/addresses`, `/address/[id]`)
+  - [x] Mobile: Shipping label flow (`/shipping/[transactionId]`)
+  - [x] Phone and email now required for addresses (USPS requirement)
+  - [x] Friendly error messages for common Shippo errors
+  - [ ] Switch to live Shippo API key for production
+- [x] Post Creation Improvements
+  - [x] Size field added with common sizes (XS-XXL, numeric, One Size)
+  - [x] Horizontal scroll size selector with tap-to-select
+  - [x] Custom size text input for non-standard sizes
 
 ### Known Issues
 - [ ] Domain nafisaszcloset.com not fully configured (Wix DNS conflict)
@@ -130,7 +146,15 @@
 ## NEXT STEPS
 
 ### Immediate Priority
-1. **Stripe Integration Completion**
+1. **Shipping - Go Live**
+   - [x] Shippo API integration complete (test mode working)
+   - [x] Addresses require phone/email (USPS requirement)
+   - [ ] Get live Shippo API key (`shippo_live_...`)
+   - [ ] Add payment method to Shippo account for label purchases
+   - [ ] Update SHIPPO_API_KEY in Vercel with live key
+   - [ ] Test full label purchase flow with real carriers
+
+2. **Stripe Integration Completion**
    - [x] Stripe Connect onboarding URL fix (now uses web redirects)
    - [ ] Test full payment flow end-to-end on physical device
    - [ ] Verify pre-authorization capture on auction end
@@ -138,22 +162,16 @@
    - [ ] Configure production Stripe keys
    - [ ] Set up Stripe webhooks for production
 
-2. **Shipping Integration**
-   - [ ] Choose shipping provider (Shippo, EasyPost, or ShipEngine)
-   - [ ] Implement shipping label generation API
-   - [ ] Add shipping cost calculation at checkout
-   - [ ] Integrate tracking number updates
-   - [ ] Shipping notifications to buyer
-
-3. **API Server**
-   - [x] API deployed to Vercel (serverless) - accessible from anywhere
-   - [x] Mobile app configured to use cloud API
-   - [ ] (Optional) Migrate to persistent server for WebSockets if needed
+3. **Mobile App Updates Pending TestFlight**
+   - [ ] Size field on post creation form (code ready, needs build)
+   - [ ] Phone/email required on address form (code ready, needs build)
+   - Build command: `cd mobile && npx eas build --profile preview --platform ios`
+   - Submit command: `npx eas submit --platform ios --latest`
 
 ### App Store Submission
 4. **TestFlight / App Store**
-   - [x] Build with `preview` profile for TestFlight (in progress)
-   - [ ] Submit to App Store Connect
+   - [x] Build with `preview` profile for TestFlight
+   - [x] EAS account migrated to raynmakr-inc (paid plan)
    - [ ] Beta testing with internal testers
    - [ ] App Store screenshots and metadata
    - [ ] Privacy policy and terms of service
@@ -207,6 +225,56 @@ npx expo start --dev-client   # Start Metro for development builds
 - [x] **CRON_SECRET** - Added to Vercel environment (production, preview, development)
 - [x] **Resend Email Setup** - Email notifications (requires RESEND_API_KEY in Vercel)
 - [x] **EAS Build** - iOS builds configured (development, preview, production profiles)
+- [x] **Shippo Shipping** - Label generation API (test mode working, needs live key)
+
+## SHIPPO SHIPPING SETUP
+
+### Current Status
+- **API Key:** Test mode (`shippo_test_...`) - labels are void/test only
+- **Carriers Enabled:** USPS, UPS, Canada Post (via Shippo accounts)
+
+### Environment Variables
+```bash
+npx vercel env add SHIPPO_API_KEY   # shippo_test_... or shippo_live_...
+```
+
+### To Go Live
+1. Go to https://apps.goshippo.com/settings/api
+2. Copy your **Live Token** (starts with `shippo_live_`)
+3. Add payment method at https://apps.goshippo.com/settings/billing
+4. Update Vercel:
+   ```bash
+   npx vercel env rm SHIPPO_API_KEY --yes
+   npx vercel env add SHIPPO_API_KEY  # paste live key
+   ```
+
+### API Endpoints
+- `GET/POST /api/shipping/addresses` - User address CRUD
+- `POST /api/shipping/validate` - Validate address with Shippo
+- `POST /api/shipping/rates` - Get shipping rates for transaction
+- `POST /api/shipping/label` - Purchase shipping label
+- `GET /api/shipping/track` - Get tracking info
+- `POST /api/shipping/quick-estimate` - Quick rate estimate by ZIP
+
+### Requirements for Label Purchase
+- **USPS requires:** Phone AND email on both sender and recipient addresses
+- **Addresses must be different:** Cannot ship to same address (buyer ≠ seller)
+- **Rates expire:** ~1-2 hours after fetching, must get fresh rates
+
+## TEST DATA
+
+### Test Users
+| User | Email | Role | Address |
+|------|-------|------|---------|
+| KC Daya | me@qdaya.com | curator | 854 Longfellow Ave, Mississauga ON |
+| Sophie Chen | sophiefinds@test.nafisascloset.com | buyer | 100 Queen St W, Toronto ON |
+
+### Test Transactions
+| TX ID | Buyer | Curator | Status | Amount |
+|-------|-------|---------|--------|--------|
+| 3 | Sophie Chen | KC Daya | paid | $5,800 |
+
+Use Transaction #3 to test shipping label flow (different addresses).
 
 ## STRIPE CONNECT SETUP
 
