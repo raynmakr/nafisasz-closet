@@ -23,8 +23,8 @@ import { api } from '@/services/api';
 const STATUS_LABELS: Record<TransactionStatus, string> = {
   pending_payment: 'Payment Pending',
   payment_failed: 'Payment Failed',
-  paid: 'Paid - Awaiting Shipment',
-  curator_confirmed: 'Preparing to Ship',
+  paid: 'Ready to Ship',
+  curator_confirmed: 'Ready to Ship',
   shipped: 'Shipped',
   delivered: 'Delivered',
   payout_complete: 'Complete',
@@ -463,26 +463,8 @@ export default function OrderDetailScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Seller: Confirm Purchase */}
-        {!isBuyer && status === 'paid' && (
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: colors.accent }]}
-            onPress={handleConfirmPurchase}
-            disabled={actionLoading}
-          >
-            {actionLoading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="bag-check-outline" size={20} color="#FFFFFF" />
-                <Text style={styles.actionButtonText}>Confirm Purchase</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        )}
-
         {/* Seller: Create Shipping Label */}
-        {!isBuyer && status === 'curator_confirmed' && !showTrackingInput && (
+        {!isBuyer && (status === 'paid' || status === 'curator_confirmed') && !showTrackingInput && (
           <>
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: colors.accent }]}

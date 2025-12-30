@@ -344,8 +344,8 @@ async function handlePurchaseLabel(req, res, decoded) {
     return res.status(403).json({ error: 'Not authorized' });
   }
 
-  // Verify transaction is in correct status
-  if (tx.status !== 'curator_confirmed') {
+  // Verify transaction is in correct status (allow from paid or curator_confirmed)
+  if (tx.status !== 'paid' && tx.status !== 'curator_confirmed') {
     return res.status(400).json({ error: `Cannot generate label in status: ${tx.status}` });
   }
 
