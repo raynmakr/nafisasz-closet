@@ -6,7 +6,7 @@
 - **Version:** 1.0 MVP
 - **Type:** Mobile marketplace app (iOS + Android)
 - **Stage:** Phase 3 - App Store Preparation
-- **Last Updated:** 2025-12-30 (Shippo shipping integration, size field, EAS account migration)
+- **Last Updated:** 2025-12-31 (AI Search, Elegant Splash Screen)
 - **API URL:** https://nafisasz-closet.vercel.app (cloud-deployed)
 - **GitHub:** https://github.com/raynmakr/nafisasz-closet
 - **EAS Account:** raynmakr-inc (corporate account with paid plan)
@@ -138,6 +138,26 @@
   - [x] Size field added with common sizes (XS-XXL, numeric, One Size)
   - [x] Horizontal scroll size selector with tap-to-select
   - [x] Custom size text input for non-standard sizes
+- [x] OpenAI Vision Integration
+  - [x] Auto-analyze first photo for title, brand, description, tags
+  - [x] Scan Tag button to extract price and size from tags
+  - [x] Confirmation modal when AI suggests values for non-empty fields
+  - [x] Backend endpoints: `/api/ai/analyze-product`, `/api/ai/analyze-tag`
+  - [x] OPENAI_API_KEY added to Vercel
+- [x] AI-Enhanced Search
+  - [x] Database: Added `tags` column to listings with GIN index
+  - [x] Unified search across listings + curators (tabbed results)
+  - [x] Natural language search with AI query parsing ("red leather bag under $500")
+  - [x] Autocomplete for @handles and #hashtags
+  - [x] Backend: `/api/search`, `/api/search/autocomplete`, `/api/ai/parse-search`
+  - [x] Mobile: Redesigned search screen with Products/Curators tabs
+  - [x] AI toggle button for natural language mode
+- [x] Elegant Splash Screen
+  - [x] Purple background matching native splash (no white flash)
+  - [x] Spring animation: logo scales up from 0.85 to 1.0
+  - [x] Tagline: "LUXURY FASHION, CURATED" fades in
+  - [x] Gold pulsing loading dots (staggered animation)
+  - [x] Smooth fade-out transition to app
 
 ### Known Issues
 - [ ] Domain nafisaszcloset.com not fully configured (Wix DNS conflict)
@@ -162,16 +182,20 @@
    - [ ] Configure production Stripe keys
    - [ ] Set up Stripe webhooks for production
 
-3. **Mobile App Updates Pending TestFlight**
-   - [ ] Size field on post creation form (code ready, needs build)
-   - [ ] Phone/email required on address form (code ready, needs build)
+3. **Mobile App - Current TestFlight Build (v1.0.0 build 10)**
+   - [x] Size field on post creation form
+   - [x] Phone/email required on address form
+   - [x] AI-enhanced search with Products/Curators tabs
+   - [x] Elegant splash screen with gold loading dots
+   - [x] Correct app icon (nc_icon.png)
    - Build command: `cd mobile && npx eas build --profile preview --platform ios`
-   - Submit command: `npx eas submit --platform ios --latest`
+   - Upload command: `xcrun altool --upload-app -f [IPA] -t ios -u me@qdaya.com -p [APP_PASSWORD]`
 
 ### App Store Submission
 4. **TestFlight / App Store**
    - [x] Build with `preview` profile for TestFlight
    - [x] EAS account migrated to raynmakr-inc (paid plan)
+   - [x] Build v10 uploaded to TestFlight (2025-12-31)
    - [ ] Beta testing with internal testers
    - [ ] App Store screenshots and metadata
    - [ ] Privacy policy and terms of service
@@ -226,6 +250,31 @@ npx expo start --dev-client   # Start Metro for development builds
 - [x] **Resend Email Setup** - Email notifications (requires RESEND_API_KEY in Vercel)
 - [x] **EAS Build** - iOS builds configured (development, preview, production profiles)
 - [x] **Shippo Shipping** - Label generation API (test mode working, needs live key)
+- [x] **OpenAI Vision** - AI-powered product and tag analysis (requires OPENAI_API_KEY)
+
+## OPENAI VISION SETUP
+
+### Features
+1. **Product Photo Analysis** - Auto-analyzes first photo to extract title, brand, description
+2. **Tag Scanner** - Separate button to scan price/size tags (photo not saved to listing)
+
+### Environment Variables
+```bash
+npx vercel env add OPENAI_API_KEY   # sk-... from OpenAI dashboard
+```
+
+### API Endpoints
+- `POST /api/ai/analyze-product` - Analyze product photo (Cloudinary URL)
+- `POST /api/ai/analyze-tag` - Analyze tag photo (base64)
+
+### Mobile Integration
+- Service: `/mobile/services/ai.ts`
+- UI: "Scan Tag" button in create screen, auto-analysis on first photo
+- Confirmation modal shown when AI suggests values for non-empty fields
+
+### Cost Estimate
+- GPT-4o Vision: ~$0.01-0.03 per image
+- Expected: 2-3 calls per listing (~$0.05-0.10 per listing)
 
 ## SHIPPO SHIPPING SETUP
 
@@ -266,15 +315,22 @@ npx vercel env add SHIPPO_API_KEY   # shippo_test_... or shippo_live_...
 ### Test Users
 | User | Email | Role | Address |
 |------|-------|------|---------|
-| KC Daya | me@qdaya.com | curator | 854 Longfellow Ave, Mississauga ON |
-| Sophie Chen | sophiefinds@test.nafisascloset.com | buyer | 100 Queen St W, Toronto ON |
+| KC Daya | me@qdaya.com | curator | 854 Longfellow Ave, Mississauga, ON L5H 2X8 (CA) |
+| Sophie Chen | sophiefinds@test.nafisascloset.com | buyer | 100 Queen St W, Toronto, ON M5H 2N2 (CA) |
 
 ### Test Transactions
 | TX ID | Buyer | Curator | Status | Amount |
 |-------|-------|---------|--------|--------|
 | 3 | Sophie Chen | KC Daya | paid | $5,800 |
 
-Use Transaction #3 to test shipping label flow (different addresses).
+Use Transaction #3 to test shipping label flow. UPS works for CA-to-CA in test mode.
+
+### Shipping Test Results (2025-12-30)
+- ✅ Shippo API integration working in test mode
+- ✅ USPS label purchase successful
+- ✅ UPS label purchase successful (activated in Shippo)
+- ✅ DHL Express rates available for international
+- ⚠️ Canada Post: **requires live API key** (test mode not supported by Canada Post API)
 
 ## STRIPE CONNECT SETUP
 

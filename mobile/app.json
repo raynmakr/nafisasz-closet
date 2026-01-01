@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "scheme": "nafisascloset",
     "userInterfaceStyle": "automatic",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/nc_icon.png",
     "splash": {
       "backgroundColor": "#1A0A2E",
       "image": "./assets/nc-logo.png",
@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nafisascloset.app",
-      "buildNumber": "7",
+      "buildNumber": "10",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to record hunt stories and take product photos.",
@@ -29,7 +29,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/nc_icon.png",
         "backgroundColor": "#1A0A2E"
       },
       "package": "com.nafisascloset.app",
@@ -53,7 +53,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/nc_icon.png",
           "color": "#1A0A2E"
         }
       ],

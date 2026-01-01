@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
@@ -18,7 +19,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useThemeColors } from '@/hooks';
 import { SPACING, FONTS, BORDER_RADIUS } from '@/constants';
-import { uploadService, listingsService, curatorsService } from '@/services';
+import { uploadService, listingsService, curatorsService, aiService } from '@/services';
+import type { ProductAnalysisResult, TagAnalysisResult } from '@/services/ai';
 
 // Duration options with minutes for non-linear slider mapping
 const DURATION_STOPS = [
@@ -46,12 +48,23 @@ export default function CreateScreen() {
   const [brand, setBrand] = useState('');
   const [size, setSize] = useState('');
   const [price, setPrice] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   const [durationIndex, setDurationIndex] = useState(2); // Default: 6 hours (index 2)
 
   // Get current duration info from slider position
   const currentDuration = useMemo(() => DURATION_STOPS[durationIndex], [durationIndex]);
   const [isPosting, setIsPosting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
+
+  // AI Analysis States
+  const [isAnalyzingProduct, setIsAnalyzingProduct] = useState(false);
+  const [isAnalyzingTag, setIsAnalyzingTag] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingAiData, setPendingAiData] = useState<{
+    type: 'product' | 'tag';
+    data: ProductAnalysisResult | TagAnalysisResult;
+  } | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -69,7 +82,13 @@ export default function CreateScreen() {
 
     if (!result.canceled && result.assets) {
       const newPhotos = result.assets.map(asset => asset.uri);
+      const isFirstPhoto = photos.length === 0;
       setPhotos(prev => [...prev, ...newPhotos].slice(0, 10));
+
+      // Trigger AI analysis for the first photo
+      if (isFirstPhoto && newPhotos.length > 0) {
+        handleFirstPhotoAnalysis(newPhotos[0]);
+      }
     }
   };
 
@@ -85,12 +104,104 @@ export default function CreateScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setPhotos(prev => [...prev, result.assets[0].uri].slice(0, 10));
+      const isFirstPhoto = photos.length === 0;
+      const newPhotoUri = result.assets[0].uri;
+      setPhotos(prev => [...prev, newPhotoUri].slice(0, 10));
+
+      // Trigger AI analysis for the first photo
+      if (isFirstPhoto) {
+        handleFirstPhotoAnalysis(newPhotoUri);
+      }
     }
   };
 
   const removePhoto = (index: number) => {
     setPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // AI Analysis Functions
+  const applyProductAnalysis = (result: ProductAnalysisResult) => {
+    if (result.title) setTitle(result.title);
+    if (result.brand) setBrand(result.brand);
+    if (result.description) setDescription(result.description);
+    if (result.tags && result.tags.length > 0) setTags(result.tags);
+  };
+
+  const applyTagAnalysis = (result: TagAnalysisResult) => {
+    if (result.price) setPrice(result.price.toString());
+    if (result.size) setSize(result.size);
+  };
+
+  const handleFirstPhotoAnalysis = async (photoUri: string) => {
+    // Only analyze if this is the first photo being added
+    if (photos.length > 0) return;
+
+    setIsAnalyzingProduct(true);
+    setAiError(null);
+
+    try {
+      // First, upload the image to get Cloudinary URL
+      const uploadedUrl = await uploadService.uploadImage(photoUri);
+
+      // Then analyze with AI
+      const result = await aiService.analyzeProduct(uploadedUrl);
+
+      // Check if any fields already have values
+      const hasExistingValues = title.trim() || brand.trim() || description.trim();
+
+      if (hasExistingValues) {
+        // Show confirmation modal
+        setPendingAiData({ type: 'product', data: result });
+        setShowConfirmModal(true);
+      } else {
+        // Auto-fill fields
+        applyProductAnalysis(result);
+      }
+    } catch (error: any) {
+      console.error('Product analysis failed:', error);
+      setAiError('Could not analyze photo. You can fill in the details manually.');
+    } finally {
+      setIsAnalyzingProduct(false);
+    }
+  };
+
+  const handleScanTag = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow camera access to scan tags.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    setIsAnalyzingTag(true);
+    setAiError(null);
+
+    try {
+      // Analyze the tag photo directly (not uploaded to Cloudinary)
+      const tagResult = await aiService.analyzeTag(result.assets[0].uri);
+
+      // Check if price or size already have values
+      const hasExistingValues = price.trim() || size.trim();
+
+      if (hasExistingValues) {
+        // Show confirmation modal
+        setPendingAiData({ type: 'tag', data: tagResult });
+        setShowConfirmModal(true);
+      } else {
+        // Auto-fill fields
+        applyTagAnalysis(tagResult);
+      }
+    } catch (error: any) {
+      console.error('Tag analysis failed:', error);
+      setAiError('Could not read the tag. Please enter the details manually.');
+    } finally {
+      setIsAnalyzingTag(false);
+    }
   };
 
   const handleAddPhoto = () => {
@@ -112,6 +223,7 @@ export default function CreateScreen() {
     setBrand('');
     setSize('');
     setPrice('');
+    setTags([]);
     setDurationIndex(2); // Reset to 6 hours
   };
 
@@ -160,6 +272,7 @@ export default function CreateScreen() {
         photos: uploadedUrls,
         retailPrice: priceNum,
         auctionDuration: currentDuration.value,
+        tags: tags.length > 0 ? tags : undefined,
       });
 
       setIsPosting(false);
@@ -239,6 +352,19 @@ export default function CreateScreen() {
                   <Ionicons name="add" size={32} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
+            </View>
+          )}
+
+          {/* AI Error Message */}
+          {aiError && (
+            <View style={[styles.aiErrorContainer, { backgroundColor: colors.surface }]}>
+              <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
+              <Text style={[styles.aiErrorText, { color: colors.textMuted }]}>
+                {aiError}
+              </Text>
+              <TouchableOpacity onPress={() => setAiError(null)}>
+                <Ionicons name="close" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
             </View>
           )}
 
@@ -336,6 +462,30 @@ export default function CreateScreen() {
               onChangeText={setSize}
               maxLength={20}
             />
+
+            {/* Scan Tag Button */}
+            <TouchableOpacity
+              style={[
+                styles.scanTagButton,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.accent,
+                },
+              ]}
+              onPress={handleScanTag}
+              disabled={isAnalyzingTag}
+            >
+              {isAnalyzingTag ? (
+                <ActivityIndicator size="small" color={colors.accent} />
+              ) : (
+                <>
+                  <Ionicons name="scan-outline" size={20} color={colors.accent} />
+                  <Text style={[styles.scanTagText, { color: colors.accent }]}>
+                    Scan Tag for Price & Size
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
 
           {/* Price Input */}
@@ -469,6 +619,105 @@ export default function CreateScreen() {
             )}
           </TouchableOpacity>
         </View>
+
+        {/* AI Analysis Loading Overlay */}
+        {isAnalyzingProduct && (
+          <View style={styles.analysisOverlay}>
+            <View style={[styles.analysisCard, { backgroundColor: colors.surface }]}>
+              <ActivityIndicator size="large" color={colors.accent} />
+              <Text style={[styles.analysisText, { color: colors.text }]}>
+                Analyzing photo...
+              </Text>
+              <Text style={[styles.analysisSubtext, { color: colors.textSecondary }]}>
+                Extracting product details
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* AI Confirmation Modal */}
+        <Modal
+          visible={showConfirmModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowConfirmModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Replace Existing Values?
+              </Text>
+
+              {pendingAiData?.type === 'product' && (
+                <View style={styles.modalBody}>
+                  <Text style={[styles.modalText, { color: colors.textSecondary }]}>
+                    AI detected the following:
+                  </Text>
+                  {(pendingAiData.data as ProductAnalysisResult).title && (
+                    <Text style={[styles.modalField, { color: colors.text }]}>
+                      Title: {(pendingAiData.data as ProductAnalysisResult).title}
+                    </Text>
+                  )}
+                  {(pendingAiData.data as ProductAnalysisResult).brand && (
+                    <Text style={[styles.modalField, { color: colors.text }]}>
+                      Brand: {(pendingAiData.data as ProductAnalysisResult).brand}
+                    </Text>
+                  )}
+                  {(pendingAiData.data as ProductAnalysisResult).description && (
+                    <Text style={[styles.modalField, { color: colors.text }]} numberOfLines={3}>
+                      Description: {(pendingAiData.data as ProductAnalysisResult).description}
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              {pendingAiData?.type === 'tag' && (
+                <View style={styles.modalBody}>
+                  <Text style={[styles.modalText, { color: colors.textSecondary }]}>
+                    AI detected from tag:
+                  </Text>
+                  {(pendingAiData.data as TagAnalysisResult).price && (
+                    <Text style={[styles.modalField, { color: colors.text }]}>
+                      Price: ${(pendingAiData.data as TagAnalysisResult).price}
+                    </Text>
+                  )}
+                  {(pendingAiData.data as TagAnalysisResult).size && (
+                    <Text style={[styles.modalField, { color: colors.text }]}>
+                      Size: {(pendingAiData.data as TagAnalysisResult).size}
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, { backgroundColor: colors.border }]}
+                  onPress={() => {
+                    setShowConfirmModal(false);
+                    setPendingAiData(null);
+                  }}
+                >
+                  <Text style={[styles.modalButtonText, { color: colors.text }]}>Keep Current</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalButton, { backgroundColor: colors.accent }]}
+                  onPress={() => {
+                    if (pendingAiData?.type === 'product') {
+                      applyProductAnalysis(pendingAiData.data as ProductAnalysisResult);
+                    } else if (pendingAiData?.type === 'tag') {
+                      applyTagAnalysis(pendingAiData.data as TagAnalysisResult);
+                    }
+                    setShowConfirmModal(false);
+                    setPendingAiData(null);
+                  }}
+                >
+                  <Text style={styles.modalButtonTextWhite}>Replace</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </KeyboardAvoidingView>
   );
@@ -691,5 +940,106 @@ const styles = StyleSheet.create({
   uploadProgressText: {
     color: '#FFFFFF',
     fontSize: FONTS.sizes.sm,
+  },
+  // AI Analysis Styles
+  scanTagButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    marginTop: SPACING.md,
+    gap: SPACING.sm,
+  },
+  scanTagText: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: '500',
+  },
+  aiErrorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.md,
+  },
+  aiErrorText: {
+    flex: 1,
+    fontSize: FONTS.sizes.sm,
+  },
+  analysisOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  analysisCard: {
+    padding: SPACING.xl,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  analysisText: {
+    fontSize: FONTS.sizes.lg,
+    fontWeight: '600',
+  },
+  analysisSubtext: {
+    fontSize: FONTS.sizes.sm,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  modalContent: {
+    width: '100%',
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+  },
+  modalTitle: {
+    fontSize: FONTS.sizes.lg,
+    fontWeight: '600',
+    marginBottom: SPACING.md,
+    textAlign: 'center',
+  },
+  modalBody: {
+    marginBottom: SPACING.lg,
+  },
+  modalText: {
+    fontSize: FONTS.sizes.md,
+    marginBottom: SPACING.sm,
+  },
+  modalField: {
+    fontSize: FONTS.sizes.md,
+    marginTop: SPACING.xs,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: '600',
+  },
+  modalButtonTextWhite: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

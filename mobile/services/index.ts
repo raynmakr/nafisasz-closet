@@ -11,3 +11,5 @@ export { auctionService } from './auctionService';
 export { messagesService } from './messages';
 export { purseService } from './purse';
 export { shippingService } from './shipping';
+export { aiService } from './ai';
+export { searchService } from './search';

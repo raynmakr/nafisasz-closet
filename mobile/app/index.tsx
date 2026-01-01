@@ -1,77 +1,120 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Redirect } from 'expo-router';
-import { View, Image, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, StyleSheet, Animated, Easing } from 'react-native';
 import { useAuth } from '../src/context/AuthContext';
 
 const LOGO = require('../assets/nc-logo.png');
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function Index() {
   const { isAuthenticated, isLoading, isProfileComplete } = useAuth();
-  const [showSplash, setShowSplash] = useState(true);
 
   // Animation values
+  const logoScale = useRef(new Animated.Value(0.85)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  const logoPosition = useRef(new Animated.Value(SCREEN_HEIGHT * 0.33)).current; // Start at 1/3
+  const taglineOpacity = useRef(new Animated.Value(0)).current;
+  const dot1Opacity = useRef(new Animated.Value(0.3)).current;
+  const dot2Opacity = useRef(new Animated.Value(0.3)).current;
+  const dot3Opacity = useRef(new Animated.Value(0.3)).current;
   const splashOpacity = useRef(new Animated.Value(1)).current;
+  const showSplash = useRef(true);
 
   useEffect(() => {
-    // Start animation immediately
-    // Phase 1: Fade in while dropping (0-1.2s)
+    // Phase 1: Logo scales up and fades in (0-800ms)
     Animated.parallel([
+      Animated.spring(logoScale, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
       Animated.timing(logoOpacity, {
         toValue: 1,
-        duration: 800,
+        duration: 600,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
-      Animated.timing(logoPosition, {
-        toValue: SCREEN_HEIGHT * 0.66, // End at 2/3
-        duration: 1200,
+    ]).start();
+
+    // Phase 2: Tagline fades in (600ms delay)
+    setTimeout(() => {
+      Animated.timing(taglineOpacity, {
+        toValue: 1,
+        duration: 400,
         useNativeDriver: true,
-      }),
-    ]).start(() => {
-      // Phase 2: Hold briefly then fade out (1.2-2s)
-      setTimeout(() => {
-        Animated.timing(splashOpacity, {
-          toValue: 0,
-          duration: 600,
-          useNativeDriver: true,
-        }).start(() => {
-          setShowSplash(false);
-        });
-      }, 200); // Brief hold
-    });
+      }).start();
+    }, 600);
+
+    // Phase 3: Dots start pulsing (1000ms delay)
+    setTimeout(() => {
+      const createPulse = (dot: Animated.Value, delay: number) => {
+        const pulse = () => {
+          Animated.sequence([
+            Animated.timing(dot, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+            Animated.timing(dot, {
+              toValue: 0.3,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+          ]).start(() => {
+            if (showSplash.current) {
+              setTimeout(pulse, 600);
+            }
+          });
+        };
+        setTimeout(pulse, delay);
+      };
+
+      createPulse(dot1Opacity, 0);
+      createPulse(dot2Opacity, 100);
+      createPulse(dot3Opacity, 200);
+    }, 1000);
+
+    // Phase 4: Fade out everything (1800ms delay)
+    setTimeout(() => {
+      showSplash.current = false;
+      Animated.timing(splashOpacity, {
+        toValue: 0,
+        duration: 400,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }, 1800);
   }, []);
 
-  // Show splash screen with logo animation
-  if (showSplash) {
+  // Still loading auth - show splash
+  if (isLoading) {
     return (
       <Animated.View style={[styles.splashContainer, { opacity: splashOpacity }]}>
-        <Animated.Image
-          source={LOGO}
-          style={[
-            styles.logo,
-            {
-              opacity: logoOpacity,
-              transform: [{ translateY: logoPosition }],
-            },
-          ]}
-          resizeMode="contain"
-        />
+        <View style={styles.contentContainer}>
+          <Animated.Image
+            source={LOGO}
+            style={[
+              styles.logo,
+              {
+                opacity: logoOpacity,
+                transform: [{ scale: logoScale }],
+              },
+            ]}
+            resizeMode="contain"
+          />
+          <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>
+            Luxury Fashion, Curated
+          </Animated.Text>
+          <View style={styles.dotsContainer}>
+            <Animated.View style={[styles.dot, { opacity: dot1Opacity }]} />
+            <Animated.View style={[styles.dot, { opacity: dot2Opacity }]} />
+            <Animated.View style={[styles.dot, { opacity: dot3Opacity }]} />
+          </View>
+        </View>
       </Animated.View>
     );
   }
 
-  // Still loading auth
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        {/* Empty purple screen while loading */}
-      </View>
-    );
-  }
-
-  // After splash, redirect based on auth state
+  // After auth loads, redirect based on state
   if (isAuthenticated) {
     if (isProfileComplete) {
       return <Redirect href="/(tabs)" />;
@@ -86,16 +129,34 @@ export default function Index() {
 const styles = StyleSheet.create({
   splashContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-  },
-  loadingContainer: {
-    flex: 1,
     backgroundColor: '#1A0A2E',
+  },
+  contentContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logo: {
     width: 280,
     height: 60,
-    position: 'absolute',
+  },
+  tagline: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 14,
+    fontWeight: '300',
+    letterSpacing: 2,
+    marginTop: 20,
+    textTransform: 'uppercase',
+  },
+  dotsContainer: {
+    flexDirection: 'row',
+    marginTop: 40,
+    gap: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#D4AF37',
   },
 });

@@ -26,6 +26,7 @@ export interface CreateListingInput {
   returnsAllowed?: boolean;
   localPickupAvailable?: boolean;
   photos: string[];
+  tags?: string[];
 }
 
 interface ListingsResponse {

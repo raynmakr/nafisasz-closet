@@ -44,6 +44,7 @@ export interface Listing {
   currentHighBid: number | null;
   highBidderId: string | null;
   photos: string[];
+  tags: string[];
   status: ListingStatus;
   auctionDuration: AuctionDuration;
   auctionStart: string | null;
