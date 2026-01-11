@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -42,6 +42,7 @@ type DurationValue = typeof DURATION_STOPS[number]['value'];
 
 export default function CreateScreen() {
   const colors = useThemeColors();
+  const scrollViewRef = useRef<ScrollView>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -230,6 +231,8 @@ export default function CreateScreen() {
     setPrice('');
     setTags([]);
     setDurationIndex(2); // Reset to 6 hours
+    // Scroll to top
+    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
   };
 
   const handlePost = async () => {
@@ -306,13 +309,45 @@ export default function CreateScreen() {
     >
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>New Post</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Share your latest find
-          </Text>
+          <View style={styles.headerTop}>
+            <View style={styles.headerTitleContainer}>
+              <Text style={[styles.title, { color: colors.text }]}>New Post</Text>
+              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                Share your latest find
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.cancelButton, { backgroundColor: colors.surface }]}
+              onPress={() => {
+                const hasContent = photos.length > 0 || title.trim() || description.trim() || brand.trim() || price.trim();
+                if (hasContent) {
+                  Alert.alert(
+                    'Discard Post?',
+                    'You have unsaved changes. Are you sure you want to discard this post?',
+                    [
+                      { text: 'Keep Editing', style: 'cancel' },
+                      {
+                        text: 'Discard',
+                        style: 'destructive',
+                        onPress: () => {
+                          resetForm();
+                          router.replace('/(tabs)');
+                        },
+                      },
+                    ]
+                  );
+                } else {
+                  router.replace('/(tabs)');
+                }
+              }}
+            >
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView
+          ref={scrollViewRef}
           style={styles.content}
           showsVerticalScrollIndicator={true}
           keyboardShouldPersistTaps="handled"
@@ -747,6 +782,21 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.md,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerTitleContainer: {
+    flex: 1,
+  },
+  cancelButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
     fontSize: FONTS.sizes.xxxl,
