@@ -33,6 +33,7 @@
         "backgroundColor": "#1A0A2E"
       },
       "package": "com.nafisascloset.app",
+      "softwareKeyboardLayoutMode": "pan",
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
