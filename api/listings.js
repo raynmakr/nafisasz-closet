@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { getActiveListings, getListing, createListing, updateListing, publishListing, getCurator, getListingBids, query } from '../lib/db.js';
-import { notifyFollowersNewListing } from '../lib/notifications.js';
+import { notifyFollowersNewListing, sendPushNotification } from '../lib/notifications.js';
+import { cancelPreAuth, refundPayment } from '../lib/stripe.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 
@@ -70,6 +71,110 @@ export default async function handler(req, res) {
       }
 
       const { action, listingId } = req.body;
+
+      // Cancel listing with refunds
+      if (action === 'cancel') {
+        if (!listingId) {
+          return res.status(400).json({ error: 'Missing listingId' });
+        }
+
+        // Get listing and verify ownership
+        const listing = await getListing(listingId);
+        if (!listing) {
+          return res.status(404).json({ error: 'Listing not found' });
+        }
+
+        const curator = await getCurator(decoded.userId);
+        if (!curator || listing.curator_id !== curator.id) {
+          return res.status(403).json({ error: 'Not authorized to cancel this listing' });
+        }
+
+        // Only allow cancellation of active listings
+        if (listing.status !== 'active' && listing.status !== 'ACTIVE') {
+          return res.status(400).json({ error: `Cannot cancel listing in status: ${listing.status}` });
+        }
+
+        const refundResults = { preAuthsCancelled: 0, paymentsRefunded: 0, errors: [] };
+
+        // 1. Cancel all pre-auth holds on active bids
+        const bidsResult = await query(
+          `SELECT id, bidder_id, amount, payment_intent_id FROM bids WHERE listing_id = $1 AND payment_intent_id IS NOT NULL`,
+          [listingId]
+        );
+
+        for (const bid of bidsResult.rows) {
+          if (bid.payment_intent_id) {
+            try {
+              await cancelPreAuth(bid.payment_intent_id);
+              refundResults.preAuthsCancelled++;
+              console.log(`Cancelled pre-auth ${bid.payment_intent_id} for bid ${bid.id}`);
+            } catch (err) {
+              // Pre-auth might already be captured or cancelled
+              console.error(`Failed to cancel pre-auth ${bid.payment_intent_id}:`, err.message);
+              refundResults.errors.push(`Bid ${bid.id}: ${err.message}`);
+            }
+          }
+        }
+
+        // 2. Check for any captured transaction and refund if exists
+        const txResult = await query(
+          `SELECT id, payment_intent_id, final_price, buyer_id, status FROM transactions WHERE listing_id = $1`,
+          [listingId]
+        );
+
+        if (txResult.rows[0]) {
+          const tx = txResult.rows[0];
+
+          // Only refund if payment was captured (status is 'paid' or later)
+          if (tx.payment_intent_id && ['paid', 'curator_confirmed', 'shipped'].includes(tx.status)) {
+            try {
+              const refund = await refundPayment(tx.payment_intent_id, null, 'requested_by_customer', {
+                reason: 'curator_cancelled_listing',
+                listingId: listingId,
+                transactionId: tx.id,
+              });
+              refundResults.paymentsRefunded++;
+              console.log(`Refunded payment ${tx.payment_intent_id} for transaction ${tx.id}`);
+
+              // Update transaction status
+              await query(
+                `UPDATE transactions SET status = 'refunded', refund_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+                [refund.id, tx.id]
+              );
+            } catch (err) {
+              console.error(`Failed to refund payment ${tx.payment_intent_id}:`, err.message);
+              refundResults.errors.push(`Transaction ${tx.id}: ${err.message}`);
+            }
+          }
+        }
+
+        // 3. Update listing status to CANCELLED
+        await query(
+          `UPDATE listings SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          [listingId]
+        );
+
+        // 4. Notify affected bidders
+        const uniqueBidders = [...new Set(bidsResult.rows.map(b => b.bidder_id))];
+        for (const bidderId of uniqueBidders) {
+          try {
+            await sendPushNotification(
+              bidderId,
+              'Listing Cancelled',
+              `The listing "${listing.title}" has been cancelled by the curator. Any held funds have been released.`,
+              { type: 'listing_cancelled', listingId }
+            );
+          } catch (err) {
+            console.error(`Failed to notify bidder ${bidderId}:`, err.message);
+          }
+        }
+
+        return res.json({
+          success: true,
+          message: 'Listing cancelled successfully',
+          refunds: refundResults,
+        });
+      }
 
       // Publish existing listing
       if (action === 'publish') {

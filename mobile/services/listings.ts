@@ -73,6 +73,11 @@ export const listingsService = {
     await api.delete('/listings', { id });
   },
 
+  async cancelListing(id: string): Promise<{ success: boolean; message: string; refunds: { preAuthsCancelled: number; paymentsRefunded: number; errors: string[] } }> {
+    const response = await api.post<{ success: boolean; message: string; refunds: { preAuthsCancelled: number; paymentsRefunded: number; errors: string[] } }>('/listings', { action: 'cancel', listingId: id });
+    return response;
+  },
+
   async getMyListings(): Promise<{ data: Listing[] }> {
     const response = await api.get<ListingsResponse>('/listings/my');
     return { data: response.listings || [] };

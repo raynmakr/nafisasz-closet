@@ -199,6 +199,23 @@ export default function ListingDetailScreen() {
     },
   });
 
+  const cancelListingMutation = useMutation({
+    mutationFn: () => listingsService.cancelListing(id!),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['listings'] });
+      queryClient.invalidateQueries({ queryKey: ['my-listings'] });
+      queryClient.invalidateQueries({ queryKey: ['listing', id] });
+      router.back();
+      const refundMsg = result.refunds.preAuthsCancelled > 0 || result.refunds.paymentsRefunded > 0
+        ? ` ${result.refunds.preAuthsCancelled} claim holds released, ${result.refunds.paymentsRefunded} payments refunded.`
+        : '';
+      Alert.alert('Cancelled', `Post has been cancelled.${refundMsg}`);
+    },
+    onError: (error: Error) => {
+      Alert.alert('Error', error.message || 'Failed to cancel listing');
+    },
+  });
+
   const handleDelete = () => {
     Alert.alert(
       'Delete Post',
@@ -209,6 +226,26 @@ export default function ListingDetailScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: () => deleteMutation.mutate(),
+        },
+      ]
+    );
+  };
+
+  const handleCancelListing = () => {
+    const bidCount = listing?.bidCount || 0;
+    const hasBids = bidCount > 0;
+
+    Alert.alert(
+      'Cancel Post',
+      hasBids
+        ? `This will cancel the post and release all ${bidCount} claim hold(s). Any charged payments will be refunded. This action cannot be undone.`
+        : 'Are you sure you want to cancel this post? This action cannot be undone.',
+      [
+        { text: 'Keep Post', style: 'cancel' },
+        {
+          text: 'Cancel Post',
+          style: 'destructive',
+          onPress: () => cancelListingMutation.mutate(),
         },
       ]
     );
@@ -605,6 +642,20 @@ export default function ListingDetailScreen() {
                 </TouchableOpacity>
               )}
 
+              {/* Cancel with Refund button - only show for active listings */}
+              {listing.status === 'active' && (
+                <TouchableOpacity
+                  style={[styles.cancelButton, { borderColor: colors.error, backgroundColor: 'rgba(230, 57, 70, 0.1)' }]}
+                  onPress={handleCancelListing}
+                  disabled={cancelListingMutation.isPending}
+                >
+                  <Ionicons name="ban-outline" size={20} color={colors.error} />
+                  <Text style={[styles.cancelButtonText, { color: colors.error }]}>
+                    {cancelListingMutation.isPending ? 'Cancelling...' : 'Cancel & Refund'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
                 style={[styles.deleteButton, { borderColor: colors.error }]}
                 onPress={handleDelete}
@@ -915,6 +966,20 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   closeEarlyButtonText: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: '600',
+  },
+  cancelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.md,
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  cancelButtonText: {
     fontSize: FONTS.sizes.md,
     fontWeight: '600',
   },
