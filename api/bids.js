@@ -41,6 +41,7 @@ export default async function handler(req, res) {
         id: bid.id.toString(),
         amount: parseFloat(bid.amount),
         isWinning: bid.is_winning,
+        selectedSize: bid.selected_size || null,
         createdAt: bid.created_at,
         listing: {
           id: bid.listing_id.toString(),
@@ -48,7 +49,8 @@ export default async function handler(req, res) {
           photo: bid.listing_photos?.[0] || '',
           status: bid.listing_status?.toUpperCase() || 'ACTIVE',
           currentHighBid: bid.current_high_bid ? parseFloat(bid.current_high_bid) : null,
-          auctionEnd: bid.auction_end
+          auctionEnd: bid.auction_end,
+          availableSizes: bid.available_sizes || []
         }
       }));
 
@@ -65,7 +67,7 @@ export default async function handler(req, res) {
     const client = await pool.connect();
 
     try {
-      const { listingId, amount } = req.body;
+      const { listingId, amount, selectedSize } = req.body;
 
       if (!listingId || !amount) {
         client.release();
@@ -73,6 +75,7 @@ export default async function handler(req, res) {
       }
 
       const bidAmount = parseFloat(amount);
+      let finalSelectedSize = selectedSize || null;
 
       // Get user's payment method
       const userResult = await client.query(
@@ -136,17 +139,38 @@ export default async function handler(req, res) {
         if (!listingResult.rows[0]) throw new Error('Listing not found');
         if (listingResult.rows[0].status !== 'active') throw new Error('Auction not active');
 
-        const currentBid = listingResult.rows[0].current_high_bid || listingResult.rows[0].starting_bid;
+        const listing = listingResult.rows[0];
+        const availableSizes = listing.available_sizes || [];
+
+        // Size validation
+        if (availableSizes.length > 1) {
+          // Multiple sizes available - require selection
+          if (!finalSelectedSize) {
+            throw new Error('Please select a size');
+          }
+          if (!availableSizes.includes(finalSelectedSize)) {
+            throw new Error('Selected size is not available');
+          }
+        } else if (availableSizes.length === 1) {
+          // Single size - auto-select it
+          finalSelectedSize = availableSizes[0];
+        } else if (listing.size && !finalSelectedSize) {
+          // Legacy listing with single size - auto-select
+          finalSelectedSize = listing.size;
+        }
+        // If no sizes at all, proceed without size (backward compat)
+
+        const currentBid = listing.current_high_bid || listing.starting_bid;
         if (bidAmount <= parseFloat(currentBid)) throw new Error('Bid must be higher than current bid');
 
         // Mark previous winning bid as not winning
         await client.query('UPDATE bids SET is_winning = FALSE WHERE listing_id = $1', [listingId]);
 
-        // Insert new bid with payment_intent_id
+        // Insert new bid with payment_intent_id and selected_size
         const bidResult = await client.query(
-          `INSERT INTO bids (listing_id, bidder_id, amount, is_winning, payment_intent_id)
-           VALUES ($1, $2, $3, TRUE, $4) RETURNING *`,
-          [listingId, decoded.userId, bidAmount, paymentIntent.id]
+          `INSERT INTO bids (listing_id, bidder_id, amount, is_winning, payment_intent_id, selected_size)
+           VALUES ($1, $2, $3, TRUE, $4, $5) RETURNING *`,
+          [listingId, decoded.userId, bidAmount, paymentIntent.id, finalSelectedSize]
         );
 
         // Update listing
@@ -171,7 +195,7 @@ export default async function handler(req, res) {
         await client.query('COMMIT');
 
         const bid = bidResult.rows[0];
-        const listing = await getListing(listingId);
+        const refreshedListing = await getListing(listingId);
 
         // Cancel previous bidder's pre-auth (async, don't block response)
         if (previousPaymentIntentId && previousHighBidderId !== decoded.userId) {
@@ -194,12 +218,13 @@ export default async function handler(req, res) {
             id: bid.id,
             amount: parseFloat(bid.amount),
             isWinning: bid.is_winning,
+            selectedSize: bid.selected_size || null,
             createdAt: bid.created_at
           },
           listing: {
-            currentHighBid: parseFloat(listing.current_high_bid),
-            auctionEnd: listing.auction_end,
-            extensionsUsed: listing.extensions_used
+            currentHighBid: parseFloat(refreshedListing.current_high_bid),
+            auctionEnd: refreshedListing.auction_end,
+            extensionsUsed: refreshedListing.extensions_used
           }
         });
       } catch (bidError) {

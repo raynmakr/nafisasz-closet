@@ -109,7 +109,7 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: 'Curator account not approved yet' });
       }
 
-      const { title, description, brand, size, category, condition, retailPrice, photos, auctionDuration, returnsAllowed, localPickupAvailable } = req.body;
+      const { title, description, brand, size, sizes, category, condition, retailPrice, photos, auctionDuration, returnsAllowed, localPickupAvailable } = req.body;
 
       if (!title || !retailPrice || !auctionDuration || !photos?.length) {
         return res.status(400).json({ error: 'Missing required fields' });
@@ -120,6 +120,7 @@ export default async function handler(req, res) {
         description,
         brand,
         size,
+        sizes, // New: array of available sizes
         category,
         condition,
         retailPrice,
@@ -198,12 +199,18 @@ export default async function handler(req, res) {
 }
 
 function formatListing(l) {
+  // Build availableSizes: prefer available_sizes array, fallback to single size
+  const availableSizes = l.available_sizes && l.available_sizes.length > 0
+    ? l.available_sizes
+    : (l.size ? [l.size] : []);
+
   return {
     id: l.id,
     title: l.title,
     description: l.description,
     brand: l.brand,
-    size: l.size,
+    size: l.size, // Keep for backward compatibility
+    availableSizes, // New: array of available sizes
     category: l.category,
     condition: l.condition,
     retailPrice: parseFloat(l.retail_price),

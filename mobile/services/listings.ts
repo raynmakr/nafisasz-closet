@@ -18,7 +18,8 @@ export interface CreateListingInput {
   title: string;
   description?: string;
   brand?: string;
-  size?: string;
+  size?: string; // Legacy single size (backward compat)
+  sizes?: string[]; // Array of available sizes
   category?: string;
   condition?: string;
   retailPrice: number;

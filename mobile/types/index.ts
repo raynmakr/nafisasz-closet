@@ -37,6 +37,7 @@ export interface Listing {
   description: string | null;
   brand: string | null;
   size: string | null;
+  availableSizes: string[]; // Array of available sizes
   category: string | null;
   condition: string | null;
   retailPrice: number;
@@ -72,6 +73,7 @@ export interface ListingCurator {
 export interface Bid {
   id: string;
   amount: number;
+  selectedSize: string | null;
   createdAt: string;
   bidder: {
     id: string;
@@ -83,6 +85,7 @@ export interface UserClaim {
   id: string;
   amount: number;
   isWinning: boolean;
+  selectedSize: string | null;
   createdAt: string;
   listing: {
     id: string;
@@ -91,6 +94,7 @@ export interface UserClaim {
     status: ListingStatus;
     currentHighBid: number | null;
     auctionEnd: string | null;
+    availableSizes: string[];
   };
 }
 

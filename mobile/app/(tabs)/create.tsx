@@ -46,7 +46,7 @@ export default function CreateScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [brand, setBrand] = useState('');
-  const [size, setSize] = useState('');
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]); // Multi-select sizes
   const [price, setPrice] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [durationIndex, setDurationIndex] = useState(2); // Default: 6 hours (index 2)
@@ -129,7 +129,12 @@ export default function CreateScreen() {
 
   const applyTagAnalysis = (result: TagAnalysisResult) => {
     if (result.price) setPrice(result.price.toString());
-    if (result.size) setSize(result.size);
+    if (result.size) {
+      // Add to selected sizes if not already there
+      setSelectedSizes(prev =>
+        prev.includes(result.size!) ? prev : [...prev, result.size!]
+      );
+    }
   };
 
   const handleFirstPhotoAnalysis = async (photoUri: string) => {
@@ -185,8 +190,8 @@ export default function CreateScreen() {
       // Analyze the tag photo directly (not uploaded to Cloudinary)
       const tagResult = await aiService.analyzeTag(result.assets[0].uri);
 
-      // Check if price or size already have values
-      const hasExistingValues = price.trim() || size.trim();
+      // Check if price or sizes already have values
+      const hasExistingValues = price.trim() || selectedSizes.length > 0;
 
       if (hasExistingValues) {
         // Show confirmation modal
@@ -221,7 +226,7 @@ export default function CreateScreen() {
     setTitle('');
     setDescription('');
     setBrand('');
-    setSize('');
+    setSelectedSizes([]);
     setPrice('');
     setTags([]);
     setDurationIndex(2); // Reset to 6 hours
@@ -268,7 +273,7 @@ export default function CreateScreen() {
         title: title.trim(),
         description: description.trim() || undefined,
         brand: brand.trim() || undefined,
-        size: size.trim() || undefined,
+        sizes: selectedSizes.length > 0 ? selectedSizes : undefined,
         photos: uploadedUrls,
         retailPrice: priceNum,
         auctionDuration: currentDuration.value,
@@ -412,10 +417,13 @@ export default function CreateScreen() {
             />
           </View>
 
-          {/* Size Input */}
+          {/* Size Input - Multi-Select */}
           <View style={styles.inputSection}>
             <Text style={[styles.inputLabel, { color: colors.text }]}>
-              Size
+              Available Sizes
+            </Text>
+            <Text style={[styles.inputHint, { color: colors.textMuted }]}>
+              Select all sizes available at the boutique
             </Text>
             <ScrollView
               horizontal
@@ -423,45 +431,53 @@ export default function CreateScreen() {
               style={styles.sizeScroll}
               contentContainerStyle={styles.sizeScrollContent}
             >
-              {SIZE_OPTIONS.map((sizeOption) => (
-                <TouchableOpacity
-                  key={sizeOption}
-                  style={[
-                    styles.sizeOption,
-                    {
-                      backgroundColor: size === sizeOption ? colors.accent : colors.surface,
-                      borderColor: size === sizeOption ? colors.accent : colors.border,
-                    },
-                  ]}
-                  onPress={() => setSize(size === sizeOption ? '' : sizeOption)}
-                >
-                  <Text
+              {SIZE_OPTIONS.map((sizeOption) => {
+                const isSelected = selectedSizes.includes(sizeOption);
+                return (
+                  <TouchableOpacity
+                    key={sizeOption}
                     style={[
-                      styles.sizeOptionText,
-                      { color: size === sizeOption ? '#FFFFFF' : colors.text },
+                      styles.sizeOption,
+                      {
+                        backgroundColor: isSelected ? colors.accent : colors.surface,
+                        borderColor: isSelected ? colors.accent : colors.border,
+                      },
                     ]}
+                    onPress={() => {
+                      setSelectedSizes(prev =>
+                        isSelected
+                          ? prev.filter(s => s !== sizeOption)
+                          : [...prev, sizeOption]
+                      );
+                    }}
                   >
-                    {sizeOption}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      style={[
+                        styles.sizeOptionText,
+                        { color: isSelected ? '#FFFFFF' : colors.text },
+                      ]}
+                    >
+                      {sizeOption}
+                    </Text>
+                    {isSelected && (
+                      <Ionicons name="checkmark" size={14} color="#FFFFFF" style={{ marginLeft: 4 }} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
-            <TextInput
-              style={[
-                styles.textInput,
-                {
-                  backgroundColor: colors.surface,
-                  color: colors.text,
-                  borderColor: colors.border,
-                  marginTop: SPACING.sm,
-                },
-              ]}
-              placeholder="Or enter custom size"
-              placeholderTextColor={colors.textMuted}
-              value={size}
-              onChangeText={setSize}
-              maxLength={20}
-            />
+
+            {/* Selected sizes summary */}
+            {selectedSizes.length > 0 && (
+              <View style={[styles.selectedSizesSummary, { backgroundColor: colors.surface }]}>
+                <Text style={[styles.selectedSizesLabel, { color: colors.textSecondary }]}>
+                  Selected: {selectedSizes.join(', ')}
+                </Text>
+                <TouchableOpacity onPress={() => setSelectedSizes([])}>
+                  <Text style={[styles.clearSizesText, { color: colors.accent }]}>Clear All</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Scan Tag Button */}
             <TouchableOpacity
@@ -894,14 +910,36 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   sizeOption: {
+    flexDirection: 'row',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     minWidth: 44,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   sizeOptionText: {
+    fontSize: FONTS.sizes.sm,
+    fontWeight: '600',
+  },
+  inputHint: {
+    fontSize: FONTS.sizes.sm,
+    marginBottom: SPACING.sm,
+  },
+  selectedSizesSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.sm,
+    marginTop: SPACING.sm,
+  },
+  selectedSizesLabel: {
+    fontSize: FONTS.sizes.sm,
+    flex: 1,
+  },
+  clearSizesText: {
     fontSize: FONTS.sizes.sm,
     fontWeight: '600',
   },

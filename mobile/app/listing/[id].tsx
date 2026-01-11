@@ -10,6 +10,7 @@ import {
   Dimensions,
   Animated,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -37,6 +38,8 @@ export default function ListingDetailScreen() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [completionStatus, setCompletionStatus] = useState<'idle' | 'completing' | 'completed'>('idle');
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [showSizePicker, setShowSizePicker] = useState(false);
   const heartScale = useRef(new Animated.Value(0)).current;
 
   const { data: listing, isLoading, refetch } = useQuery({
@@ -169,11 +172,13 @@ export default function ListingDetailScreen() {
   });
 
   const placeBidMutation = useMutation({
-    mutationFn: async (amount: number) => {
-      return api.post('/bids', { listingId: id, amount });
+    mutationFn: async ({ amount, size }: { amount: number; size?: string | null }) => {
+      return api.post('/bids', { listingId: id, amount, selectedSize: size });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['listing', id] });
+      setShowSizePicker(false);
+      setSelectedSize(null);
       Alert.alert('Success', 'Your claim has been placed!');
     },
     onError: (error: Error) => {
@@ -260,11 +265,24 @@ export default function ListingDetailScreen() {
     setLastTap(now);
   };
 
-  const handleBuyNow = async () => {
+  const handleBuyNow = async (sizeOverride?: string | null) => {
     if (!user) {
       Alert.alert('Sign In Required', 'Please sign in to claim this item');
       return;
     }
+
+    // Check if size selection is required
+    const availableSizes = listing?.availableSizes || [];
+    const sizeToUse = sizeOverride !== undefined ? sizeOverride : selectedSize;
+
+    if (availableSizes.length > 1 && !sizeToUse) {
+      // Multiple sizes available - show picker
+      setShowSizePicker(true);
+      return;
+    }
+
+    // Auto-select if only one size
+    const finalSize = sizeToUse || (availableSizes.length === 1 ? availableSizes[0] : null);
 
     // Check if user has a payment method
     try {
@@ -290,7 +308,7 @@ export default function ListingDetailScreen() {
     }
 
     const claimAmount = (listing?.currentHighBid || listing?.startingBid || 0) + 1;
-    placeBidMutation.mutate(claimAmount);
+    placeBidMutation.mutate({ amount: claimAmount, size: finalSize });
   };
 
   const isOwnListing = user?.curator?.id === listing?.curator?.id;
@@ -449,14 +467,30 @@ export default function ListingDetailScreen() {
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Details</Text>
             <View style={styles.details}>
-              {listing.size && (
+              {/* Available Sizes */}
+              {listing.availableSizes && listing.availableSizes.length > 0 && (
                 <View style={styles.detailRow}>
                   <Text style={[styles.detailLabel, { color: colors.textMuted }]}>
-                    Size
+                    Available Sizes
                   </Text>
-                  <Text style={[styles.detailValue, { color: colors.text }]}>
-                    {listing.size}
-                  </Text>
+                  <View style={styles.sizesContainer}>
+                    {listing.availableSizes.map((s) => (
+                      <View
+                        key={s}
+                        style={[
+                          styles.sizeBadge,
+                          {
+                            backgroundColor: colors.surface,
+                            borderColor: colors.border,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.sizeBadgeText, { color: colors.text }]}>
+                          {s}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               )}
               {listing.condition && (
@@ -585,6 +619,79 @@ export default function ListingDetailScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* Size Picker Modal */}
+      <Modal
+        visible={showSizePicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSizePicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Select Your Size
+            </Text>
+
+            <View style={styles.sizePickerGrid}>
+              {(listing?.availableSizes || []).map((size) => (
+                <TouchableOpacity
+                  key={size}
+                  style={[
+                    styles.sizePickerOption,
+                    {
+                      backgroundColor: selectedSize === size ? colors.accent : colors.background,
+                      borderColor: selectedSize === size ? colors.accent : colors.border,
+                    },
+                  ]}
+                  onPress={() => setSelectedSize(size)}
+                >
+                  <Text
+                    style={[
+                      styles.sizePickerText,
+                      { color: selectedSize === size ? '#FFFFFF' : colors.text },
+                    ]}
+                  >
+                    {size}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: colors.border }]}
+                onPress={() => {
+                  setShowSizePicker(false);
+                  setSelectedSize(null);
+                }}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  {
+                    backgroundColor: selectedSize ? colors.accent : colors.border,
+                    opacity: selectedSize ? 1 : 0.5,
+                  },
+                ]}
+                onPress={() => {
+                  if (selectedSize) {
+                    handleBuyNow(selectedSize);
+                  }
+                }}
+                disabled={!selectedSize || placeBidMutation.isPending}
+              >
+                <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>
+                  {placeBidMutation.isPending ? 'Claiming...' : 'Confirm & Claim'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -808,6 +915,75 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   closeEarlyButtonText: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: '600',
+  },
+  // Size display styles
+  sizesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  sizeBadge: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+  },
+  sizeBadgeText: {
+    fontSize: FONTS.sizes.sm,
+    fontWeight: '500',
+  },
+  // Size Picker Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: BORDER_RADIUS.lg,
+    borderTopRightRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    paddingBottom: SPACING.xl + 20,
+  },
+  modalTitle: {
+    fontSize: FONTS.sizes.xl,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+  },
+  sizePickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+    justifyContent: 'center',
+    marginBottom: SPACING.lg,
+  },
+  sizePickerOption: {
+    minWidth: 60,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  sizePickerText: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: '600',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    alignItems: 'center',
+  },
+  modalButtonText: {
     fontSize: FONTS.sizes.md,
     fontWeight: '600',
   },
